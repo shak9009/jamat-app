@@ -3,6 +3,7 @@
     "name": "JamaitApp",
     "slug": "JamaitApp",
     "version": "1.0.0",
+    "icon": "./assets/JamatLogo.png",
     "plugins": [
       "expo-font",
       "expo-image",
@@ -19,7 +20,11 @@
       ]
     ],
     "android": {
-      "package": "com.shaik0509.JamaitApp"
+      "package": "com.shaik0509.JamaitApp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/JamatLogo.png",
+        "backgroundColor": "#ffffff"
+      }
     }
   }
 }
