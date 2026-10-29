@@ -12,34 +12,10 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAF1Vna8g8UrJeb89AdsJ6IwuR-GhYI9UI",
-        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "jamat-app-f5d97.firebaseapp.com",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "jamat-app-f5d97",
-        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "jamat-app-f5d97.appspot.com",
-        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "801575580850",
-        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:801575580850:web:fd352bdf140664cbee85ab",
-        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-2LM95SXLBX",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://mrcjmbvzrnhaiigschzt.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yY2ptYnZ6cm5oYWlpZ3NjaHp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1ODU5NjIsImV4cCI6MjEwMjE2MTk2Mn0.BoZ_nHnBLPYZqn358LVVp6ZsB7Pl-8-7WBZtEkP9ZOc",
-        "EXPO_PUBLIC_IMGBB_API_KEY": "f753d5660c017202406982a1195c2ac6"
       }
     },
     "production": {
-      "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAF1Vna8g8UrJeb89AdsJ6IwuR-GhYI9UI",
-        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "jamat-app-f5d97.firebaseapp.com",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "jamat-app-f5d97",
-        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "jamat-app-f5d97.appspot.com",
-        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "801575580850",
-        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:801575580850:web:fd352bdf140664cbee85ab",
-        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-2LM95SXLBX",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://mrcjmbvzrnhaiigschzt.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yY2ptYnZ6cm5oYWlpZ3NjaHp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1ODU5NjIsImV4cCI6MjEwMjE2MTk2Mn0.BoZ_nHnBLPYZqn358LVVp6ZsB7Pl-8-7WBZtEkP9ZOc",
-        "EXPO_PUBLIC_IMGBB_API_KEY": "f753d5660c017202406982a1195c2ac6"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
