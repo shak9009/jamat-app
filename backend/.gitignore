@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Environment secrets — never commit this!
+.env
+
+# Firebase service account private key — never commit this!
+serviceAccountKey.json
+
+# Logs
+*.log
+npm-debug.log*
