@@ -17,9 +17,16 @@ export const getDevServerIp = () => {
   return Constants?.expoConfig?.hostUri?.split(':').shift() || '10.0.2.2';
 };
 
+export const PROD_BACKEND_URL = 'https://jamat-app.onrender.com';
+
 export const getApiUrl = (port = 4000) => {
-  const ip = getDevServerIp();
-  return `http://${ip}:${port}`;
+  // If explicitly asked to use local machine dev, use local IP
+  if (process.env.EXPO_PUBLIC_USE_LOCAL === 'true') {
+    const ip = getDevServerIp();
+    return `http://${ip}:${port}`;
+  }
+  // Default to live cloud backend
+  return PROD_BACKEND_URL;
 };
 
 export const API_URL = getApiUrl(4000);
@@ -29,5 +36,7 @@ export default {
   getDevServerIp,
   getApiUrl,
   API_URL,
+  PROD_BACKEND_URL,
   PYTHON_API_URL,
 };
+

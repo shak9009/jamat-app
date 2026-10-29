@@ -25,6 +25,11 @@
         "foregroundImage": "./assets/JamatLogo.png",
         "backgroundColor": "#ffffff"
       }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2ccbe15a-2e82-414a-8000-dcd34a517d25"
+      }
     }
   }
 }
