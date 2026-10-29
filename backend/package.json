@@ -4,6 +4,7 @@
   "private": true,
   "main": "server.js",
   "scripts": {
+    "build": "echo 'No build required for Express'",
     "start": "node server.js",
     "dev": "nodemon server.js",
     "python-face": "python face_service.py"
