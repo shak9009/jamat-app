@@ -1,0 +1,11 @@
+{
+  "name": "jamait-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install-backend": "npm --prefix backend install",
+    "build": "npm --prefix backend install",
+    "start": "npm --prefix backend start",
+    "dev": "npm --prefix backend start"
+  }
+}

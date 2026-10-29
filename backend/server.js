@@ -51,6 +51,11 @@ const apiLimiter = rateLimit({
 // Apply rate limiter to all API routes
 app.use('/api', apiLimiter);
 
+// Health Check route
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: '🚀 Jamait Backend is running cleanly' });
+});
+
 // Use Routes
 app.use('/api', authRoutes());
 app.use('/api/admin', adminRoutes());
