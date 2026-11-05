@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useAuth } from '../../context/AuthContext';
 import { API_URL } from '../../config/apiConfig';
+import { supabase } from '../../config/supabaseClient';
 import Toast from 'react-native-toast-message';
 
 const { height } = Dimensions.get('window');
@@ -68,106 +69,166 @@ export default function RegisterScreen({ navigation }) {
 
 
 
-  const handleSendOtp = async () => {
+  const handleRegister = async () => {
     if (!name || !email || !phone || !aadhaar || !password || !occupation || !occupation.trim()) {
-      Toast.show({ type: 'error', text1: 'Missing info', text2: 'Please fill in all mandatory fields including Occupation.' });
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Missing info', 
+        text2: 'Please fill in all mandatory fields including Occupation.',
+        position: 'top',
+      });
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Toast.show({ type: 'error', text1: 'Invalid Email', text2: 'Please enter a valid email address.' });
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Invalid Email', 
+        text2: 'Please enter a valid email address.',
+        position: 'top',
+      });
       return;
     }
     if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
-      Toast.show({ type: 'error', text1: 'Invalid Phone', text2: 'Phone number must be exactly 10 digits.' });
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Invalid Phone', 
+        text2: 'Phone number must be exactly 10 digits.',
+        position: 'top',
+      });
       return;
     }
     if (aadhaar.length !== 12 || !/^\d{12}$/.test(aadhaar)) {
-      Toast.show({ type: 'error', text1: 'Invalid Aadhaar', text2: 'Aadhaar number must be exactly 12 digits.' });
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Invalid Aadhaar', 
+        text2: 'Aadhaar number must be exactly 12 digits.',
+        position: 'top',
+      });
+      return;
+    }
+    if (password.length < 6) {
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Weak Password', 
+        text2: 'Password must be at least 6 characters long.',
+        position: 'top',
+      });
       return;
     }
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          phone: phone.trim(),
-          email: email.trim() 
-        })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
-      
-      setShowOtpScreen(true);
-      setTimer(60);
-      setCanResend(false);
-      Toast.show({ type: 'success', text1: 'OTP Sent', text2: 'Please enter the 6-digit code sent to your phone.' });
-    } catch (e) {
-      console.error("OTP Send Error:", e);
-      Toast.show({ type: 'error', text1: 'Error', text2: e.message });
-    } finally {
-      setLoading(false);
-    }
-  };
+      let registered = false;
 
-  const handleVerifyAndScan = async () => {
-    if (!otp || otp.length !== 6) {
-      Toast.show({ type: 'error', text1: 'Invalid OTP', text2: 'Please enter a valid 6-digit OTP.' });
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      // 1. Verify OTP and Create Supabase User via Backend
-      const verifyRes = await fetch(`${API_URL}/api/verify-otp-register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          phone: phone.trim(), 
-          otp: otp.trim(), 
-          name: name.trim(), 
-          email: email.trim(),
-          aadhaar,
-          occupation: occupation.trim(),
-          password
-        })
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok) throw new Error(verifyData.error || 'OTP verification failed');
-
-      // Prompt Local Authentication for Biometric Link
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
-      if (hasHardware && isEnrolled) {
-        const authResult = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'Authenticate thumb to complete registration',
-          fallbackLabel: 'Use Passcode',
+      // 1. Try direct Backend /api/register
+      try {
+        const response = await fetch(`${API_URL}/api/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            phone: phone.trim(),
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            aadhaar: aadhaar.trim(),
+            occupation: occupation.trim(),
+            password
+          })
         });
-        
-        if (!authResult.success) {
-          console.log('Biometric registration was cancelled.');
+        const data = await response.json();
+        if (response.ok && data.success) {
+          registered = true;
+        } else if (!response.ok && response.status !== 404) {
+          throw new Error(data.error || 'Registration failed');
+        }
+      } catch (apiErr) {
+        if (!apiErr.message.includes('404') && !apiErr.message.includes('Network request failed') && !apiErr.message.includes('Failed to fetch')) {
+          throw apiErr;
         }
       }
 
-      // Auto-login user after successful registration
+      // 2. Direct Supabase Fallback if backend endpoint is unavailable
+      if (!registered) {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: email.trim().toLowerCase(),
+          password,
+          options: {
+            data: {
+              name: name.trim(),
+              phone: phone.trim(),
+              aadhaar: aadhaar.trim(),
+              occupation: occupation.trim(),
+              role: 'user',
+            }
+          }
+        });
+
+        if (authError) {
+          if (authError.message.includes('already registered')) {
+            throw new Error('This email address is already registered. Please login.');
+          }
+          throw authError;
+        }
+
+        if (authData?.user) {
+          try {
+            await supabase.from('users').upsert({
+              id: authData.user.id,
+              name: name.trim(),
+              email: email.trim().toLowerCase(),
+              phone: phone.trim(),
+              aadhaar: aadhaar.trim(),
+              occupation: occupation.trim(),
+              role: 'user',
+            });
+          } catch (dbErr) {
+            console.warn('DB upsert warning:', dbErr);
+          }
+        }
+      }
+
+      // Biometric Link check
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      if (hasHardware && isEnrolled) {
+        try {
+          await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Authenticate to complete registration',
+            fallbackLabel: 'Use Passcode',
+          });
+        } catch (bioErr) {
+          console.log('Biometric registration optional error:', bioErr);
+        }
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Registration Successful 🎉',
+        text2: 'Welcome to Jamaat E Ahle Hadees!',
+        position: 'top',
+        visibilityTime: 3000,
+      });
+
+      // Auto-login user
       try {
         await silentLogin(email.trim().toLowerCase(), password);
       } catch (loginErr) {
-        Toast.show({ type: 'success', text1: 'Registration Successful 🎉', text2: 'Please login manually.' });
         navigation.navigate('Login');
       }
 
     } catch (e) {
       console.error("Registration Error Details:", e);
-      Toast.show({ type: 'error', text1: 'Registration failed', text2: e.message });
+      Toast.show({
+        type: 'error',
+        text1: 'Registration Failed',
+        text2: e?.message || 'Failed to complete registration',
+        position: 'top',
+        visibilityTime: 4000,
+      });
     } finally {
       setLoading(false);
     }
   };
-
 
   return (
     <>
@@ -203,151 +264,108 @@ export default function RegisterScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {!showOtpScreen ? (
-            <>
-              <Text style={styles.title}>Create Account</Text>
-              <Text style={styles.subtitle}>Fill in your details to get started</Text>
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.subtitle}>Fill in your details to get started</Text>
 
-              <View style={[styles.inputWrapper, focusedInput === 'name' && styles.inputFocused]}>
-                <Text style={styles.inputIcon}>👤</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Full name"
-                  placeholderTextColor="#aaa"
-                  value={name}
-                  onChangeText={setName}
-                  onFocus={() => setFocusedInput('name')}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
+          <View style={[styles.inputWrapper, focusedInput === 'name' && styles.inputFocused]}>
+            <Text style={styles.inputIcon}>👤</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Full name"
+              placeholderTextColor="#aaa"
+              value={name}
+              onChangeText={setName}
+              onFocus={() => setFocusedInput('name')}
+              onBlur={() => setFocusedInput(null)}
+            />
+          </View>
 
-              <View style={[styles.inputWrapper, focusedInput === 'email' && styles.inputFocused]}>
-                <Text style={styles.inputIcon}>📧</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email Address"
-                  placeholderTextColor="#aaa"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={setEmail}
-                  onFocus={() => setFocusedInput('email')}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
+          <View style={[styles.inputWrapper, focusedInput === 'email' && styles.inputFocused]}>
+            <Text style={styles.inputIcon}>📧</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Email Address"
+              placeholderTextColor="#aaa"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              onFocus={() => setFocusedInput('email')}
+              onBlur={() => setFocusedInput(null)}
+            />
+          </View>
 
-              <View style={[styles.inputWrapper, focusedInput === 'aadhaar' && styles.inputFocused]}>
-                <Text style={styles.inputIcon}>🪪</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Aadhaar Number (12 digits)"
-                  placeholderTextColor="#aaa"
-                  keyboardType="numeric"
-                  maxLength={12}
-                  value={aadhaar}
-                  onChangeText={setAadhaar}
-                  onFocus={() => setFocusedInput('aadhaar')}
-                  onBlur={() => setFocusedInput(null)}
-                />
-                {aadhaar.length === 12 && (
-                  <Text style={{ color: '#1b6b3c', fontSize: 16 }}>✓</Text>
-                )}
-              </View>
+          <View style={[styles.inputWrapper, focusedInput === 'aadhaar' && styles.inputFocused]}>
+            <Text style={styles.inputIcon}>🪪</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Aadhaar Number (12 digits)"
+              placeholderTextColor="#aaa"
+              keyboardType="numeric"
+              maxLength={12}
+              value={aadhaar}
+              onChangeText={setAadhaar}
+              onFocus={() => setFocusedInput('aadhaar')}
+              onBlur={() => setFocusedInput(null)}
+            />
+            {aadhaar.length === 12 && (
+              <Text style={{ color: '#1b6b3c', fontSize: 16 }}>✓</Text>
+            )}
+          </View>
 
-              <View style={[styles.inputWrapper, focusedInput === 'occupation' && styles.inputFocused]}>
-                <Text style={styles.inputIcon}>💼</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Occupation / Profession *"
-                  placeholderTextColor="#aaa"
-                  value={occupation}
-                  onChangeText={setOccupation}
-                  onFocus={() => setFocusedInput('occupation')}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
+          <View style={[styles.inputWrapper, focusedInput === 'occupation' && styles.inputFocused]}>
+            <Text style={styles.inputIcon}>💼</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Occupation / Profession *"
+              placeholderTextColor="#aaa"
+              value={occupation}
+              onChangeText={setOccupation}
+              onFocus={() => setFocusedInput('occupation')}
+              onBlur={() => setFocusedInput(null)}
+            />
+          </View>
 
-              <View style={[styles.inputWrapper, focusedInput === 'phone' && styles.inputFocused]}>
-                <Text style={styles.inputIcon}>📱</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Mobile Number (10 digits)"
-                  placeholderTextColor="#aaa"
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  value={phone}
-                  onChangeText={setPhone}
-                  onFocus={() => setFocusedInput('phone')}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
+          <View style={[styles.inputWrapper, focusedInput === 'phone' && styles.inputFocused]}>
+            <Text style={styles.inputIcon}>📱</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Mobile Number (10 digits)"
+              placeholderTextColor="#aaa"
+              keyboardType="phone-pad"
+              maxLength={10}
+              value={phone}
+              onChangeText={setPhone}
+              onFocus={() => setFocusedInput('phone')}
+              onBlur={() => setFocusedInput(null)}
+            />
+          </View>
 
-              <View style={[styles.inputWrapper, focusedInput === 'password' && styles.inputFocused]}>
-                <Text style={styles.inputIcon}>🔒</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  placeholderTextColor="#aaa"
-                  secureTextEntry={!showPassword}
-                  value={password}
-                  onChangeText={setPassword}
-                  onFocus={() => setFocusedInput('password')}
-                  onBlur={() => setFocusedInput(null)}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ paddingHorizontal: 4 }}>
-                  <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={24} color="#666" />
-                </TouchableOpacity>
-              </View>
+          <View style={[styles.inputWrapper, focusedInput === 'password' && styles.inputFocused]}>
+            <Text style={styles.inputIcon}>🔒</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#aaa"
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+              onFocus={() => setFocusedInput('password')}
+              onBlur={() => setFocusedInput(null)}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ paddingHorizontal: 4 }}>
+              <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
 
-              <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleSendOtp}
-                disabled={loading}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.buttonText}>{loading ? 'Sending OTP...' : 'Send OTP'}</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.title}>Verify OTP</Text>
-              <Text style={styles.subtitle}>Enter the 6-digit code sent to {phone}</Text>
-              
-              <View style={[styles.inputWrapper, focusedInput === 'otp' && styles.inputFocused]}>
-                <Text style={styles.inputIcon}>🔢</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="6-digit OTP"
-                  placeholderTextColor="#aaa"
-                  keyboardType="numeric"
-                  maxLength={6}
-                  value={otp}
-                  onChangeText={setOtp}
-                  onFocus={() => setFocusedInput('otp')}
-                  onBlur={() => setFocusedInput(null)}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.button, loading && styles.buttonDisabled]}
-                onPress={handleVerifyAndScan}
-                disabled={loading}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.buttonText}>{loading ? 'Verifying...' : 'Verify & Register'}</Text>
-              </TouchableOpacity>
-
-              <View style={{ marginTop: 24, alignItems: 'center' }}>
-                {canResend ? (
-                  <TouchableOpacity onPress={handleSendOtp} disabled={loading} activeOpacity={0.7}>
-                    <Text style={{ color: '#1b6b3c', fontWeight: 'bold', fontSize: 15 }}>Resend OTP</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={{ color: '#888', fontSize: 14 }}>Resend OTP in <Text style={{ fontWeight: 'bold' }}>{timer}s</Text></Text>
-                )}
-              </View>
-            </>
-          )}
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.buttonText}>{loading ? 'Registering...' : 'Register'}</Text>
+          </TouchableOpacity>
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />

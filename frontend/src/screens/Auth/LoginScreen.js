@@ -22,6 +22,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { Image as ExpoImage } from 'expo-image';
 import { API_URL } from '../../config/apiConfig';
+import { supabase } from '../../config/supabaseClient';
 import Toast from 'react-native-toast-message';
 
 const { height } = Dimensions.get('window');
@@ -53,7 +54,12 @@ export default function LoginScreen({ navigation, route }) {
 
   const handleLogin = async () => {
     if (!phone || !password) {
-      Toast.show({ type: 'error', text1: 'Missing info', text2: 'Please enter your mobile number or email, and password.' });
+      Toast.show({ 
+        type: 'error', 
+        text1: 'Missing Information', 
+        text2: 'Please enter your mobile number or email, and password.',
+        position: 'top',
+      });
       return;
     }
 
@@ -61,7 +67,12 @@ export default function LoginScreen({ navigation, route }) {
 
     if (!isEmail) {
       if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
-        Toast.show({ type: 'error', text1: 'Invalid Input', text2: 'Phone number must be exactly 10 digits.' });
+        Toast.show({ 
+          type: 'error', 
+          text1: 'Invalid Phone Number', 
+          text2: 'Phone number must be exactly 10 digits.',
+          position: 'top',
+        });
         return;
       }
     }
@@ -71,23 +82,87 @@ export default function LoginScreen({ navigation, route }) {
       let loginEmail = phone.trim().toLowerCase();
 
       if (!isEmail) {
-        const fetchUrl = `${API_URL}/api/get-email-by-phone`;
-        console.log("Network Request -> Fetching from:", fetchUrl);
-        
-        const emailRes = await fetch(fetchUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: phone.trim() })
-        }).catch(err => {
-          console.error("Fetch Connection Error (Server might be off or IP is wrong):", err);
-          throw err;
-        });
+        // First check via Supabase users table directly
+        let foundEmail = null;
+        try {
+          const { data: userRecord, error: userErr } = await supabase
+            .from('users')
+            .select('email')
+            .eq('phone', phone.trim())
+            .limit(1);
 
-        const emailData = await emailRes.json();
-        if (!emailRes.ok) {
-          throw new Error(`API Error ${emailRes.status}: ${emailData.error || 'Unknown error'}`);
+          if (!userErr && userRecord && userRecord.length > 0) {
+            foundEmail = userRecord[0].email;
+          } else if (!userErr && userRecord && userRecord.length === 0) {
+            // Explicitly not found in users table -> User is NOT registered
+            Toast.show({
+              type: 'error',
+              text1: 'Please Register First',
+              text2: 'This mobile number is not registered. Please register your account first.',
+              position: 'top',
+              visibilityTime: 4000,
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (dbErr) {
+          console.warn("Direct DB check error:", dbErr);
         }
-        loginEmail = emailData.email;
+
+        // If direct check didn't resolve, fallback to backend API
+        if (!foundEmail) {
+          const fetchUrl = `${API_URL}/api/get-email-by-phone`;
+          const emailRes = await fetch(fetchUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phone.trim() })
+          }).catch(err => {
+            console.error("Fetch Connection Error:", err);
+            throw new Error('Unable to connect to server. Please check your internet connection.');
+          });
+
+          const emailData = await emailRes.json();
+          if (!emailRes.ok) {
+            if (emailRes.status === 404 || (emailData.error && emailData.error.toLowerCase().includes('no user found'))) {
+              Toast.show({
+                type: 'error',
+                text1: 'Please Register First',
+                text2: 'This mobile number is not registered. Please register your account first.',
+                position: 'top',
+                visibilityTime: 4000,
+              });
+              setLoading(false);
+              return;
+            }
+            throw new Error(emailData.error || 'Failed to find account');
+          }
+          foundEmail = emailData.email;
+        }
+
+        loginEmail = foundEmail;
+      } else {
+        // User entered an email address: verify if email exists
+        try {
+          const { data: emailRecord, error: emailErr } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', loginEmail)
+            .limit(1);
+
+          if (!emailErr && emailRecord && emailRecord.length === 0) {
+            Toast.show({
+              type: 'error',
+              text1: 'Please Register First',
+              text2: 'This email is not registered. Please register your account first.',
+              position: 'top',
+              visibilityTime: 4000,
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (dbErr) {
+          console.warn("Direct email check error:", dbErr);
+        }
       }
 
       const loginData = await silentLogin(loginEmail, password);
@@ -107,23 +182,32 @@ export default function LoginScreen({ navigation, route }) {
         }
       }
       
-      // Explicitly set the user context, as onAuthStateChanged might not fire 
-      // if the user is already logged in but context was cleared
       await finalizeLogin(loginData);
       
     } catch (e) {
       console.error("Login Error Details:", e);
-      if (Platform.OS === 'android') {
-        ToastAndroid.show(e.message || 'Invalid Credentials', ToastAndroid.SHORT);
+      const errMsg = e?.message || 'Invalid Credentials';
+      if (errMsg.toLowerCase().includes('invalid login credentials') || errMsg.toLowerCase().includes('invalid credentials')) {
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2: 'Incorrect password. If you are a new user, please register first.',
+          position: 'top',
+          visibilityTime: 4000,
+        });
       } else {
-        Toast.show({ type: 'error', text1: 'Login failed', text2: e.message || 'Invalid Credentials' });
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2: errMsg,
+          position: 'top',
+          visibilityTime: 3500,
+        });
       }
     } finally {
       setLoading(false);
     }
   };
-
-
 
   return (
     <>
