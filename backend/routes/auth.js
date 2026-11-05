@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { supabase } = require('../config/supabaseClient');
 
 module.exports = function() {
@@ -36,7 +37,8 @@ module.exports = function() {
       console.error('Error checking existing user:', err);
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Cryptographically secure 6-digit OTP
+    const otp = (crypto.randomInt(0, 1000000)).toString().padStart(6, '0');
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
     
     // Save OTP to DB
@@ -46,33 +48,6 @@ module.exports = function() {
     console.log('\n=============================================');
     console.log(`📱 DUMMY OTP FOR ${phone} IS: ${otp}`);
     console.log('=============================================\n');
-    
-    const fast2smsKey = process.env.FAST2SMS_API_KEY;
-    if (false /* fast2smsKey */) { // Temporarily disabled Fast2SMS
-      try {
-        const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
-          method: 'POST',
-          headers: {
-            'authorization': fast2smsKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: `Your Jamait App OTP is: ${otp}`,
-            language: 'english',
-            route: 'q',
-            numbers: phone
-          })
-        });
-        const result = await response.json();
-        if (!result.return) {
-          console.error('Fast2SMS Error:', result);
-        } else {
-          console.log(`SMS Sent successfully to ${phone} via Fast2SMS`);
-        }
-      } catch (err) {
-        console.error('Error sending SMS via Fast2SMS:', err);
-      }
-    }
 
     res.json({ success: true, message: 'OTP sent successfully' });
   });
@@ -106,7 +81,8 @@ module.exports = function() {
       return res.status(400).json({ error: 'This phone number is not registered.' });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Cryptographically secure 6-digit OTP
+    const otp = (crypto.randomInt(0, 1000000)).toString().padStart(6, '0');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     
     // Save OTP to DB
@@ -114,33 +90,6 @@ module.exports = function() {
     await supabase.from('otps').insert([{ phone, otp, expires_at: expiresAt }]);
 
     console.log(`[DEV ONLY] Reset Password OTP for ${phone} is ${otp}`);
-
-    const fast2smsKey = process.env.FAST2SMS_API_KEY;
-    if (false /* fast2smsKey */) { // Temporarily disabled Fast2SMS
-      try {
-        const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
-          method: 'POST',
-          headers: {
-            'authorization': fast2smsKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: `Your Jamait App Password Reset OTP is: ${otp}`,
-            language: 'english',
-            route: 'q',
-            numbers: phone
-          })
-        });
-        const result = await response.json();
-        if (!result.return) {
-          console.error('Fast2SMS Error:', result);
-        } else {
-          console.log(`Reset SMS Sent successfully to ${phone} via Fast2SMS`);
-        }
-      } catch (err) {
-        console.error('Error sending Reset SMS via Fast2SMS:', err);
-      }
-    }
 
     res.json({ message: 'OTP sent successfully', role: 'user' });
   });
@@ -192,6 +141,92 @@ module.exports = function() {
   });
 
   // ------------------------------------------------------------------
+  // API: Direct Register (No OTP Required)
+  // ------------------------------------------------------------------
+  router.post('/register', async (req, res) => {
+    const { phone, name, email, aadhaar, password, occupation } = req.body;
+
+    if (!phone || !name || !email || !aadhaar || !password || !occupation || !occupation.trim()) {
+      return res.status(400).json({ error: 'All fields including Occupation are required' });
+    }
+
+    try {
+      // Check phone existence
+      const { data: phoneQuery } = await supabase.from('users').select('id').eq('phone', phone.trim()).limit(1);
+      if (phoneQuery && phoneQuery.length > 0) {
+        return res.status(400).json({ error: 'This phone number is already registered. Please login.' });
+      }
+
+      // Check email existence
+      const { data: emailQuery } = await supabase.from('users').select('id').eq('email', email.toLowerCase().trim()).limit(1);
+      if (emailQuery && emailQuery.length > 0) {
+        return res.status(400).json({ error: 'This email address is already registered. Please login.' });
+      }
+
+      // Check aadhaar existence
+      if (aadhaar) {
+        const { data: aadhaarQuery } = await supabase.from('users').select('id').eq('aadhaar', aadhaar.trim()).limit(1);
+        if (aadhaarQuery && aadhaarQuery.length > 0) {
+          return res.status(400).json({ error: 'This Aadhaar number is already registered.' });
+        }
+      }
+
+      // Create Supabase Auth user
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: email.toLowerCase().trim(),
+        password: password,
+        email_confirm: true,
+        user_metadata: {
+          name: name.trim(),
+          phone: phone.trim(),
+          aadhaar: aadhaar.trim(),
+          occupation: occupation.trim(),
+          role: 'user'
+        }
+      });
+
+      if (authError) {
+        if (authError.message.includes('already registered') || authError.status === 422) {
+          return res.status(400).json({ error: 'This email address is already registered. Please login.' });
+        }
+        throw authError;
+      }
+
+      // Sync into public.users table
+      try {
+        await supabase.from('users').upsert({
+          id: authData.user.id,
+          name: name.trim(),
+          email: email.toLowerCase().trim(),
+          phone: phone.trim(),
+          aadhaar: aadhaar.trim(),
+          occupation: occupation.trim(),
+          role: 'user'
+        });
+      } catch (upsertErr) {
+        try {
+          await supabase.from('users').upsert({
+            id: authData.user.id,
+            name: name.trim(),
+            email: email.toLowerCase().trim(),
+            phone: phone.trim(),
+            aadhaar: aadhaar.trim(),
+            role: 'user'
+          });
+        } catch (fallbackErr) {
+          console.warn('public.users fallback upsert error:', fallbackErr.message);
+        }
+      }
+
+      res.json({ success: true, message: 'Registration successful' });
+
+    } catch (err) {
+      console.error('Direct Registration Error:', err);
+      res.status(500).json({ error: err.message || 'Internal server error during registration' });
+    }
+  });
+
+  // ------------------------------------------------------------------
   // API: Verify OTP & Register
   // ------------------------------------------------------------------
   router.post('/verify-otp-register', async (req, res) => {
@@ -203,7 +238,7 @@ module.exports = function() {
 
     const { data: record, error: otpError } = await supabase.from('otps').select('*').eq('phone', phone).single();
     
-    if (otpError || !record || new Date() > new Date(record.expires_at) || record.otp !== otp) {
+    if (otpError || !record || new Date() > new Date(record.expires_at) || crypto.timingSafeEqual(Buffer.from(record.otp), Buffer.from(otp)) !== 0) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
@@ -296,7 +331,7 @@ module.exports = function() {
 
     const { data: record, error: otpError } = await supabase.from('otps').select('*').eq('phone', phone).single();
     
-    if (otpError || !record || new Date() > new Date(record.expires_at) || record.otp !== otp) {
+    if (otpError || !record || new Date() > new Date(record.expires_at) || crypto.timingSafeEqual(Buffer.from(record.otp), Buffer.from(otp)) !== 0) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 

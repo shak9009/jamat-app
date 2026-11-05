@@ -334,6 +334,13 @@ module.exports = function () {
       const { userIds, returnBase64 } = (req.method === 'POST' ? req.body : req.query) || {};
       let userList = [];
 
+      // Security: Limit userIds array size to prevent DoS via massive arrays
+      // Maximum 500 IDs per export request to prevent memory exhaustion
+      const MAX_USER_IDS = 500;
+      if (Array.isArray(userIds) && userIds.length > MAX_USER_IDS) {
+        return res.status(400).json({ error: `Maximum ${MAX_USER_IDS} user IDs allowed per export request` });
+      }
+
       if (Array.isArray(userIds) && userIds.length > 0) {
         const { data, error } = await supabase
           .from('users')

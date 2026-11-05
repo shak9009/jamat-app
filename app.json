@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "44556a65-ae98-488a-8af9-b2232a5a26f8"
+      }
+    },
+    "android": {
+      "package": "com.shaikmohammed.jamaitapp"
+    }
+  }
+}

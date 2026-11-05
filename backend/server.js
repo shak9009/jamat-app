@@ -18,11 +18,11 @@ const adminRoutes = require('./routes/admin');
 const donationRoutes = require('./routes/donation');
 const settingsRoutes = require('./routes/settings');
 
-// Rate Limiting (Egress)
+// Rate Limiting (Egress) — fixed: use sync function with cached value
 let cachedLimit = 500;
 let lastFetchTime = 0;
 
-const getDailyLimit = async () => {
+const refreshDailyLimit = async () => {
   const now = Date.now();
   if (now - lastFetchTime > 60000) { // Refresh every 1 minute
     try {
@@ -37,12 +37,19 @@ const getDailyLimit = async () => {
       console.error('Error fetching rate limit:', err?.message);
     }
   }
-  return cachedLimit;
 };
+
+// Sync getter for express-rate-limit (expects number, not Promise)
+const getDailyLimit = () => cachedLimit;
+
+// Periodic refresh (fire-and-forget)
+setInterval(refreshDailyLimit, 60000);
+// Initial fetch
+refreshDailyLimit();
 
 const apiLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours window
-  max: getDailyLimit, 
+  max: getDailyLimit,
   message: { error: 'Daily request limit exceeded. Please try again tomorrow.' },
   standardHeaders: true,
   legacyHeaders: false,
