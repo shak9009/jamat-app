@@ -29,28 +29,16 @@ export default function DonationScreen() {
     if (isAdmin) fetchDonations();
   }, [isAdmin, adminTab]);
 
-  const uploadImageToImgbb = async (base64String) => {
+  // Image upload using Supabase Storage (replaces ImgBB)
+  const uploadImageToSupabase = async (base64String) => {
     try {
-      const formData = new FormData();
-      formData.append('image', base64String);
-
-      const imgbbKey = process.env.EXPO_PUBLIC_IMGBB_API_KEY;
-      if (!imgbbKey || imgbbKey === 'PASTE_YOUR_API_KEY_HERE') {
-        throw new Error('ImgBB API key is missing from .env');
-      }
-
-      const uploadRes = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, {
-        method: 'POST',
-        body: formData,
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const { uploadImageToSupabase } = await import('../../services/imageUploadService');
+      const { url } = await uploadImageToSupabase({
+        base64Image: base64String,
+        bucket: 'images',
+        folder: 'donations',
       });
-
-      const result = await uploadRes.json();
-      if (result.success) {
-        return result.data.url;
-      } else {
-        throw new Error(result.error?.message || 'ImgBB upload failed');
-      }
+      return url;
     } catch (e) {
       console.error('Image upload failed', e);
       throw new Error('Failed to upload image. Please try again.');
@@ -190,7 +178,7 @@ export default function DonationScreen() {
       let publicUrl = null;
       if (screenshot.base64) {
         Toast.show({ type: 'info', text1: 'Uploading...', text2: 'Uploading payment screenshot' });
-        publicUrl = await uploadImageToImgbb(screenshot.base64);
+        publicUrl = await uploadImageToSupabase(screenshot.base64);
       }
 
       const generatedTxnId = `REC-${Date.now()}`;

@@ -1,19 +1,38 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useRefresh } from '../context/RefreshContext';
 import { useNavigation } from '@react-navigation/native';
 import { useFonts, Amiri_400Regular, Amiri_700Bold } from '@expo-google-fonts/amiri';
 
 export default function CustomHeader({ back }) {
   const { logout, user } = useAuth();
+  const { refreshApp, isRefreshing } = useRefresh();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  
+  const spinValue = useRef(new Animated.Value(0)).current;
+
   let [fontsLoaded] = useFonts({
     Amiri_400Regular,
     Amiri_700Bold,
+  });
+
+  const handleRefresh = () => {
+    spinValue.setValue(0);
+    Animated.timing(spinValue, {
+      toValue: 1,
+      duration: 650,
+      useNativeDriver: true,
+    }).start(() => spinValue.setValue(0));
+
+    refreshApp();
+  };
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
   });
 
   const handleLogout = () => {
@@ -58,9 +77,28 @@ export default function CustomHeader({ back }) {
           )}
         </View>
 
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={28} color="#d9534f" />
-        </TouchableOpacity>
+        <View style={styles.rightSection}>
+          <TouchableOpacity
+            onPress={handleRefresh}
+            style={styles.refreshButton}
+            activeOpacity={0.7}
+            disabled={isRefreshing}
+            accessibilityLabel="Refresh Application"
+          >
+            <Animated.View style={{ transform: [{ rotate: spin }] }}>
+              <Ionicons name="refresh" size={22} color="#1b6b3c" />
+            </Animated.View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleLogout}
+            style={styles.logoutButton}
+            activeOpacity={0.7}
+            accessibilityLabel="Logout"
+          >
+            <Ionicons name="log-out-outline" size={26} color="#d9534f" />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -123,7 +161,19 @@ const styles = StyleSheet.create({
     color: '#555',
     textAlign: 'center',
   },
+  rightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  refreshButton: {
+    padding: 7,
+    marginRight: 4,
+    borderRadius: 20,
+    backgroundColor: '#e8f5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   logoutButton: {
-    padding: 8,
+    padding: 6,
   },
 });

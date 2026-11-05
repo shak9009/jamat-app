@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions, Alert, Linking, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useRefresh } from '../../context/RefreshContext';
 import { supabase } from '../../config/supabaseClient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +10,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function AdminDashboardScreen({ navigation }) {
   const { logout, user } = useAuth();
+  const { refreshApp, isRefreshing } = useRefresh();
 
   const [masjidsList, setMasjidsList] = useState([]);
   const [upcomingGroup, setUpcomingGroup] = useState([]);
@@ -233,9 +235,9 @@ export default function AdminDashboardScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <ScrollView
         contentContainerStyle={styles.container}
-        bounces={false}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[0]}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refreshApp} colors={['#1b6b3c']} tintColor="#1b6b3c" />}
       >
 
         <View style={styles.stickyHeaderWrapper}>

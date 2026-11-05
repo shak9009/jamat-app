@@ -1,0 +1,26 @@
+# EAS Ignore File
+# Ignore Gradle caches and local builds so EAS does not fail with locked files (EBUSY)
+.gradle/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+ios/build/
+ios/Pods/
+
+# Dependencies & Expo
+node_modules/
+.expo/
+npm-debug.*
+*.log
+
+# Build outputs
+*.apk
+*.aab
+dist/
+build/
+web-build/
+
+# Environment files — never upload to EAS
+.env
+.env*.local

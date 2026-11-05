@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions, Modal, TextInput, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Dimensions, Modal, TextInput, ActivityIndicator, Linking, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { useRefresh } from '../../context/RefreshContext';
 import { supabase } from '../../config/supabaseClient';
 import { API_URL } from '../../config/apiConfig';
 import Toast from 'react-native-toast-message';
@@ -13,6 +14,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }) {
   const { logout, role, user } = useAuth();
+  const { refreshApp, isRefreshing } = useRefresh();
   const [masjidsList, setMasjidsList] = useState([]);
   const [upcomingGroup, setUpcomingGroup] = useState([]);
   const [boardMembers, setBoardMembers] = useState([]);
@@ -418,7 +420,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-      <ScrollView contentContainerStyle={styles.container} bounces={false} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refreshApp} colors={['#1b6b3c']} tintColor="#1b6b3c" />}>
         {/* Top Slider Card */}
         <View style={styles.sliderWrapper}>
           <ScrollView

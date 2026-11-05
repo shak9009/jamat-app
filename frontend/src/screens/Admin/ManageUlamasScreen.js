@@ -87,27 +87,16 @@ export default function ManageUlamasScreen({ navigation }) {
     try {
       if (imageBase64) {
         try {
-          const formData = new FormData();
-          formData.append('image', imageBase64);
-          
-          const imgbbKey = process.env.EXPO_PUBLIC_IMGBB_API_KEY;
-          if (!imgbbKey) throw new Error('ImgBB API key is missing from .env');
-
-          const uploadRes = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, {
-            method: 'POST',
-            body: formData,
-            headers: { 'Content-Type': 'multipart/form-data' },
+          const { uploadImageToSupabase } = await import('../../services/imageUploadService');
+          const { url } = await uploadImageToSupabase({
+            base64Image: imageBase64,
+            bucket: 'images',
+            folder: 'ulamas',
           });
-          
-          const result = await uploadRes.json();
-          if (result.success) {
-            publicUrl = result.data.url;
-          } else {
-            throw new Error(result.error?.message || 'ImgBB upload failed');
-          }
+          publicUrl = url;
         } catch (uploadErr) {
           console.error('Image upload error:', uploadErr);
-          throw new Error('Image upload failed. Please verify your ImgBB API Key.');
+          throw new Error('Image upload failed. Please try again.');
         }
       }
 

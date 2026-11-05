@@ -2,12 +2,25 @@ import 'react-native-get-random-values';
 import React, { useEffect } from 'react';
 import { AuthProvider } from './src/context/AuthContext';
 import { SettingsProvider } from './src/context/SettingsContext';
+import { RefreshProvider, useRefresh } from './src/context/RefreshContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { useFonts, Amiri_400Regular, Amiri_700Bold } from '@expo-google-fonts/amiri';
-import BecomeAdminScreen from './src/screens/Requests/BecomeAdminScreen';
 
 import Toast from 'react-native-toast-message';
 import GlobalAzanFloatingBanner from './src/components/GlobalAzanFloatingBanner';
+
+function AppContent() {
+  const { refreshKey } = useRefresh();
+
+  return (
+    <AuthProvider key={`auth-${refreshKey}`}>
+      <SettingsProvider key={`settings-${refreshKey}`}>
+        <RootNavigator key={`nav-${refreshKey}`} />
+        <GlobalAzanFloatingBanner key={`azan-${refreshKey}`} />
+      </SettingsProvider>
+    </AuthProvider>
+  );
+}
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -24,14 +37,9 @@ export default function App() {
   }
 
   return (
-    <>
-      <AuthProvider>
-        <SettingsProvider>
-          <RootNavigator />
-          <GlobalAzanFloatingBanner />
-        </SettingsProvider>
-      </AuthProvider>
+    <RefreshProvider>
+      <AppContent />
       <Toast />
-    </>
+    </RefreshProvider>
   );
 }
