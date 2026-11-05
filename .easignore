@@ -1,0 +1,17 @@
+# EAS Ignore File
+.gradle/
+**/android/.gradle/
+**/android/app/build/
+**/android/build/
+**/android/local.properties
+node_modules/
+.expo/
+*.apk
+*.aab
+dist/
+build/
+backend/
+
+# Environment files — never upload to EAS
+.env
+.env*.local

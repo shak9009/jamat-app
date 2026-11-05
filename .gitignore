@@ -1,0 +1,24 @@
+# Root Git Ignore
+node_modules/
+*.log
+.DS_Store
+
+# Environment files
+.env
+.env*.local
+
+# Build output
+dist/
+build/
+*.apk
+*.aab
+.gradle/
+**/android/.gradle/
+**/android/app/build/
+**/android/build/
+**/android/local.properties
+
+# IDE
+.vscode/
+.idea/
+
