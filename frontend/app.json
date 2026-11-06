@@ -26,6 +26,14 @@
         "backgroundColor": "#ffffff"
       }
     },
+    "updates": {
+      "url": "https://u.expo.dev/c3fd8f67-c5a4-4953-b380-421f82076e1b",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "eas": {
         "projectId": "c3fd8f67-c5a4-4953-b380-421f82076e1b"

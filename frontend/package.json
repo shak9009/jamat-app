@@ -33,6 +33,7 @@
     "expo-local-authentication": "~58.0.2",
     "expo-sharing": "~58.0.20",
     "expo-splash-screen": "~58.0.11",
+    "expo-updates": "~58.0.10",
     "firebase": "^12.18.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
