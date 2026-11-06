@@ -68,6 +68,7 @@ app.use('/api', authRoutes());
 app.use('/api/admin', adminRoutes());
 app.use('/api/donation', donationRoutes());
 app.use('/api/settings', settingsRoutes());
+app.use('/api', settingsRoutes()); // Allows /api/upload-image directly as well
 
 // ------------------------------------------------------------------
 // Server Initialization

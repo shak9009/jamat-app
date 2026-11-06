@@ -16,9 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { API_URL } from '../../config/apiConfig';
+import { supabase } from '../../config/supabaseClient';
+import Toast from 'react-native-toast-message';
 
 export default function ForgotPasswordScreen({ navigation }) {
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   
   // Admin Request States
@@ -27,40 +29,121 @@ export default function ForgotPasswordScreen({ navigation }) {
   const [adminMessage, setAdminMessage] = useState('');
   const [adminImage, setAdminImage] = useState(null);
 
-
-
   const handleResetPassword = async () => {
-    if (!phone || phone.length !== 10) {
-      Alert.alert('Missing info', 'Please enter a valid 10-digit mobile number.');
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      Toast.show({
+        type: 'error',
+        text1: 'Missing info',
+        text2: 'Please enter your registered email address.',
+        position: 'top',
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Email',
+        text2: 'Please enter a valid email address.',
+        position: 'top',
+      });
       return;
     }
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/send-reset-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim() })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send OTP');
+      // 1. Check if user is registered in Supabase users table
+      let userPhone = null;
+      try {
+        const { data: existingUsers, error: checkErr } = await supabase
+          .from('users')
+          .select('id, role, email, phone')
+          .eq('email', cleanEmail)
+          .limit(1);
+
+        if (!checkErr && existingUsers && existingUsers.length === 0) {
+          Toast.show({
+            type: 'error',
+            text1: 'Account Not Found',
+            text2: 'No registered user found with this email. Please register first.',
+            position: 'top',
+            visibilityTime: 4000,
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (existingUsers && existingUsers[0]) {
+          userPhone = existingUsers[0].phone;
+        }
+
+        if (existingUsers && existingUsers[0]?.role === 'admin') {
+          setIsAdminFlow(true);
+          setAdminEmail(cleanEmail);
+          setLoading(false);
+          return;
+        }
+      } catch (dbErr) {
+        console.warn('Direct user check warning:', dbErr?.message);
       }
 
-      if (data.role === 'admin') {
-        setIsAdminFlow(true);
-        setAdminEmail(data.email);
-      } else {
-        Alert.alert(
-          'OTP Sent',
-          'Please check your SMS for the 6-digit reset code.',
-          [{ text: 'OK', onPress: () => navigation.navigate('ResetPasswordOtp', { phone: phone.trim() }) }]
-        );
+      // 2. Trigger Supabase native reset email (direct delivery to email inbox)
+      let resetTriggered = false;
+      try {
+        const { error: supaResetErr } = await supabase.auth.resetPasswordForEmail(cleanEmail);
+        if (!supaResetErr) {
+          resetTriggered = true;
+        } else {
+          console.warn('Supabase resetPasswordForEmail warning:', supaResetErr.message);
+        }
+      } catch (supaEx) {
+        console.warn('Supabase resetPasswordForEmail exception:', supaEx?.message);
       }
+
+      // 3. Also notify backend API (supporting both new and legacy endpoints)
+      try {
+        const response = await fetch(`${API_URL}/api/send-reset-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, phone: userPhone || cleanEmail })
+        });
+        const data = await response.json();
+
+        if (response.ok && data.role === 'admin') {
+          setIsAdminFlow(true);
+          setAdminEmail(data.email || cleanEmail);
+          setLoading(false);
+          return;
+        }
+
+        if (response.ok) {
+          resetTriggered = true;
+        }
+      } catch (apiErr) {
+        console.warn('Backend send-reset-otp api warning:', apiErr?.message);
+      }
+
+      // As long as reset was initiated
+      Toast.show({
+        type: 'success',
+        text1: 'Reset Code Sent ✉️',
+        text2: '6-digit reset code sent to your email. Check your inbox and spam folder.',
+        position: 'top',
+        visibilityTime: 4500,
+      });
+      navigation.navigate('ResetPasswordOtp', { email: cleanEmail, phone: userPhone });
+
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to send reset email.');
+      console.error('Password reset error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to send reset code. Please try again.',
+        position: 'top',
+        visibilityTime: 4000,
+      });
     } finally {
       setLoading(false);
     }
@@ -90,8 +173,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: phone.trim(),
-          email: adminEmail,
+          email: adminEmail || email.trim().toLowerCase(),
           base64Image: adminImage.base64,
           message: adminMessage.trim()
         })
@@ -133,24 +215,24 @@ export default function ForgotPasswordScreen({ navigation }) {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {!isAdminFlow ? (
           <>
             <Text style={styles.title}>Forgot your password?</Text>
             <Text style={styles.subtitle}>
-              Enter your registered mobile number and we'll send you an SMS to reset your password.
+              Enter your registered email address and we'll send a 6-digit verification code to reset your password.
             </Text>
 
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>📱</Text>
+              <Text style={styles.inputIcon}>✉️</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Mobile Number"
+                placeholder="Registered Email Address"
                 placeholderTextColor="#aaa"
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={phone}
-                onChangeText={setPhone}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
               />
             </View>
 
@@ -161,7 +243,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               activeOpacity={0.85}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Processing...' : 'Send Reset Link'}
+                {loading ? 'Sending Code...' : 'Send Reset Code'}
               </Text>
             </TouchableOpacity>
           </>

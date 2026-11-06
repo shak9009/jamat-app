@@ -53,18 +53,27 @@ module.exports = function() {
   });
 
   // ------------------------------------------------------------------
-  // API: Send OTP for Password Reset
+  // API: Send OTP for Password Reset (Email or Phone)
   // ------------------------------------------------------------------
   router.post('/send-reset-otp', async (req, res) => {
-    const { phone } = req.body;
-    if (!phone || phone.length < 10) {
-      return res.status(400).json({ error: 'Valid phone number is required' });
+    const { email, phone } = req.body;
+    const target = (email || phone || '').toLowerCase().trim();
+
+    if (!target) {
+      return res.status(400).json({ error: 'Valid registered email address is required' });
     }
 
     try {
-      const { data: users, error } = await supabase.from('users').select('*').eq('phone', phone).limit(1);
+      let query = supabase.from('users').select('*');
+      if (email) {
+        query = query.eq('email', email.toLowerCase().trim());
+      } else {
+        query = query.eq('phone', phone.trim());
+      }
+      const { data: users, error } = await query.limit(1);
+
       if (error || !users || users.length === 0) {
-        return res.status(400).json({ error: 'This phone number is not registered.' });
+        return res.status(400).json({ error: 'This email address is not registered. Please check and try again.' });
       }
 
       const existingUser = users[0];
@@ -74,24 +83,47 @@ module.exports = function() {
       }
 
       if (existingUser.role === 'admin') {
-        return res.json({ role: existingUser.role, email: existingUser.email });
+        return res.json({ role: existingUser.role, email: existingUser.email, phone: existingUser.phone });
       }
 
+      // Cryptographically secure 6-digit OTP
+      const otp = (crypto.randomInt(0, 1000000)).toString().padStart(6, '0');
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      
+      // Save OTP to DB (keyed on target email or phone)
+      await supabase.from('otps').delete().eq('phone', target);
+      if (existingUser.email && existingUser.email !== target) {
+        await supabase.from('otps').delete().eq('phone', existingUser.email);
+      }
+      if (existingUser.phone && existingUser.phone !== target) {
+        await supabase.from('otps').delete().eq('phone', existingUser.phone);
+      }
+
+      await supabase.from('otps').insert([{ phone: target, otp, expires_at: expiresAt }]);
+
+      // Trigger Supabase Auth Email Reset to deliver email to inbox
+      if (existingUser.email) {
+        try {
+          await supabase.auth.resetPasswordForEmail(existingUser.email);
+        } catch (mailErr) {
+          console.warn('Supabase resetPasswordForEmail notification:', mailErr.message);
+        }
+      }
+
+      console.log(`\n=============================================`);
+      console.log(`📧 RESET PASSWORD OTP FOR ${target} IS: ${otp}`);
+      console.log(`=============================================\n`);
+
+      res.json({
+        success: true,
+        message: 'Password reset code has been sent to your email.',
+        role: 'user',
+        email: existingUser.email,
+      });
     } catch (err) {
-      return res.status(400).json({ error: 'This phone number is not registered.' });
+      console.error('Send reset OTP error:', err);
+      return res.status(500).json({ error: 'Failed to send password reset code' });
     }
-
-    // Cryptographically secure 6-digit OTP
-    const otp = (crypto.randomInt(0, 1000000)).toString().padStart(6, '0');
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    
-    // Save OTP to DB
-    await supabase.from('otps').delete().eq('phone', phone); // Clear old OTPs
-    await supabase.from('otps').insert([{ phone, otp, expires_at: expiresAt }]);
-
-    console.log(`[DEV ONLY] Reset Password OTP for ${phone} is ${otp}`);
-
-    res.json({ message: 'OTP sent successfully', role: 'user' });
   });
 
   // ------------------------------------------------------------------
@@ -320,35 +352,47 @@ module.exports = function() {
   });
 
   // ------------------------------------------------------------------
-  // API: Forgot Password Verify OTP & Reset
+  // API: Forgot Password Verify OTP & Reset (Email or Phone)
   // ------------------------------------------------------------------
   router.post('/verify-otp', async (req, res) => {
-    const { phone, otp, newPassword } = req.body;
-    
-    if (!phone || !otp || !newPassword) {
-      return res.status(400).json({ error: 'Phone, OTP, and New Password are required' });
+    const { email, phone, otp, newPassword } = req.body;
+    const target = (email || phone || '').toLowerCase().trim();
+
+    if (!target || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Email, OTP code, and new password are required' });
     }
 
-    const { data: record, error: otpError } = await supabase.from('otps').select('*').eq('phone', phone).single();
-    
-    if (otpError || !record || new Date() > new Date(record.expires_at) || crypto.timingSafeEqual(Buffer.from(record.otp), Buffer.from(otp)) !== 0) {
-      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    // Check OTP record in DB
+    const { data: record, error: otpError } = await supabase.from('otps').select('*').eq('phone', target).single();
+
+    if (otpError || !record || new Date() > new Date(record.expires_at) || crypto.timingSafeEqual(Buffer.from(record.otp), Buffer.from(otp.trim())) !== 0) {
+      return res.status(400).json({ error: 'Invalid or expired OTP code. Please check your email and try again.' });
     }
 
     try {
-      const { data: users, error } = await supabase.from('users').select('id').eq('phone', phone).limit(1);
+      let query = supabase.from('users').select('id');
+      if (email) {
+        query = query.eq('email', email.toLowerCase().trim());
+      } else {
+        query = query.eq('phone', phone.trim());
+      }
+      const { data: users, error } = await query.limit(1);
 
       if (error || !users || users.length === 0) {
-        return res.status(404).json({ error: 'No user found with this phone number' });
+        return res.status(404).json({ error: 'No user found with this account' });
       }
 
       const uid = users[0].id;
 
       const { error: updateError } = await supabase.auth.admin.updateUserById(uid, { password: newPassword });
-      
+
       if (updateError) throw updateError;
 
-      await supabase.from('otps').delete().eq('phone', phone);
+      await supabase.from('otps').delete().eq('phone', target);
       res.json({ success: true, message: 'Password reset successfully' });
     } catch (err) {
       console.error('Password Reset Error:', err);

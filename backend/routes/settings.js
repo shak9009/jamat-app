@@ -46,5 +46,45 @@ module.exports = () => {
     }
   });
 
+  // POST Upload Image (Fallback server-side upload with service role key)
+  router.post('/upload-image', async (req, res) => {
+    try {
+      let { base64Image, folder = 'uploads', bucket = 'images', fileName } = req.body;
+      if (!base64Image) {
+        return res.status(400).json({ error: 'base64Image is required' });
+      }
+
+      if (base64Image.includes(';base64,')) {
+        base64Image = base64Image.split(';base64,')[1];
+      }
+
+      const buffer = Buffer.from(base64Image, 'base64');
+      const name = fileName || `img-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.jpg`;
+      const filePath = `${folder}/${name}`;
+
+      try {
+        await supabase.storage.createBucket(bucket, { public: true });
+      } catch (_) {}
+
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, buffer, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+
+      return res.json({ url: publicUrlData.publicUrl, path: filePath });
+    } catch (err) {
+      console.error('Image Upload Error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to upload image' });
+    }
+  });
+
   return router;
 };
