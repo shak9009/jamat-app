@@ -19,6 +19,9 @@
         }
       ]
     ],
+    "platforms": [
+      "android"
+    ],
     "android": {
       "package": "com.shaik0509.JamaitApp",
       "adaptiveIcon": {
