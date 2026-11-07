@@ -6,7 +6,8 @@ const nodemailer = require('nodemailer');
  */
 function getTransporter() {
   const user = process.env.SMTP_USER || process.env.EMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+  const rawPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+  const pass = rawPass ? rawPass.replace(/\s+/g, '') : null;
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT, 10) || 465;
   const secure = process.env.SMTP_SECURE !== undefined ? process.env.SMTP_SECURE === 'true' : port === 465;
