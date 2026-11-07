@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { supabase } = require('../config/supabaseClient');
+const { sendResetOtpEmail } = require('../services/emailService');
 
 module.exports = function() {
   const router = express.Router();
@@ -101,7 +102,14 @@ module.exports = function() {
 
       await supabase.from('otps').insert([{ phone: target, otp, expires_at: expiresAt }]);
 
-      // Trigger Supabase Auth Email Reset to deliver email to inbox
+      // 1. Deliver 6-digit OTP directly to user's inbox via Email Service (Nodemailer / Resend)
+      const emailResult = await sendResetOtpEmail({
+        toEmail: existingUser.email || target,
+        otp,
+        userName: existingUser.name,
+      });
+
+      // 2. Also trigger Supabase Auth Email Reset as fallback
       if (existingUser.email) {
         try {
           await supabase.auth.resetPasswordForEmail(existingUser.email);
@@ -110,15 +118,13 @@ module.exports = function() {
         }
       }
 
-      console.log(`\n=============================================`);
-      console.log(`📧 RESET PASSWORD OTP FOR ${target} IS: ${otp}`);
-      console.log(`=============================================\n`);
-
       res.json({
         success: true,
         message: 'Password reset code has been sent to your email.',
         role: 'user',
         email: existingUser.email,
+        emailSent: emailResult.success,
+        smtpConfigured: !emailResult.notConfigured,
       });
     } catch (err) {
       console.error('Send reset OTP error:', err);

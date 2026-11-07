@@ -102,37 +102,53 @@ export default function ForgotPasswordScreen({ navigation }) {
         console.warn('Supabase resetPasswordForEmail exception:', supaEx?.message);
       }
 
-      // 3. Also notify backend API (supporting both new and legacy endpoints)
+      // 3. Notify backend API to generate OTP and send via Email Service
+      let backendData = null;
       try {
         const response = await fetch(`${API_URL}/api/send-reset-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: cleanEmail, phone: userPhone || cleanEmail })
         });
-        const data = await response.json();
+        backendData = await response.json();
 
-        if (response.ok && data.role === 'admin') {
+        if (response.ok && backendData.role === 'admin') {
           setIsAdminFlow(true);
-          setAdminEmail(data.email || cleanEmail);
+          setAdminEmail(backendData.email || cleanEmail);
           setLoading(false);
           return;
         }
 
-        if (response.ok) {
-          resetTriggered = true;
+        if (!response.ok) {
+          throw new Error(backendData.error || 'Failed to send password reset code');
         }
+
+        resetTriggered = true;
       } catch (apiErr) {
         console.warn('Backend send-reset-otp api warning:', apiErr?.message);
+        if (!resetTriggered) {
+          throw apiErr;
+        }
       }
 
-      // As long as reset was initiated
-      Toast.show({
-        type: 'success',
-        text1: 'Reset Code Sent ✉️',
-        text2: '6-digit reset code sent to your email. Check your inbox and spam folder.',
-        position: 'top',
-        visibilityTime: 4500,
-      });
+      // Feedback to user
+      if (backendData && backendData.smtpConfigured === false) {
+        Toast.show({
+          type: 'info',
+          text1: 'Code Generated',
+          text2: 'Email SMTP not yet configured on server. Check Render logs for the 6-digit code.',
+          position: 'top',
+          visibilityTime: 5000,
+        });
+      } else {
+        Toast.show({
+          type: 'success',
+          text1: 'Reset Code Sent ✉️',
+          text2: '6-digit reset code sent to your email. Check your inbox and spam folder.',
+          position: 'top',
+          visibilityTime: 4500,
+        });
+      }
       navigation.navigate('ResetPasswordOtp', { email: cleanEmail, phone: userPhone });
 
     } catch (error) {
