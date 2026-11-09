@@ -481,3 +481,4 @@ const styles = StyleSheet.create({
   },
   miniCloseBtn: { padding: 6 },
 });
+

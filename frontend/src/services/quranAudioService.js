@@ -276,3 +276,4 @@ class AudioPlayerService {
 
 export const quranAudioService = new AudioPlayerService();
 export default quranAudioService;
+

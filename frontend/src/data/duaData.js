@@ -274,3 +274,4 @@ export const DUAS_LIST = [
     audioUrl: 'https://cdn.islamic.network/quran/audio/128/ar.alafasy/15.mp3',
   },
 ];
+

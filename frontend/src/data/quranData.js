@@ -209,3 +209,4 @@ export async function fetchSurahDetails(surahNumber) {
     throw err;
   }
 }
+
