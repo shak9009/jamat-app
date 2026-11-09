@@ -17,6 +17,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const donationRoutes = require('./routes/donation');
 const settingsRoutes = require('./routes/settings');
+const qaRoutes = require('./routes/qa');
 
 // Rate Limiting (Egress) — fixed: use sync function with cached value
 let cachedLimit = 500;
@@ -69,6 +70,7 @@ app.use('/api/admin', adminRoutes());
 app.use('/api/donation', donationRoutes());
 app.use('/api/settings', settingsRoutes());
 app.use('/api', settingsRoutes()); // Allows /api/upload-image directly as well
+app.use('/api/qa', qaRoutes());
 
 // ------------------------------------------------------------------
 // Server Initialization

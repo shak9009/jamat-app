@@ -37,13 +37,25 @@ export default function MasterAdminDashboardScreen({ navigation }) {
       const { count: usersCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'user');
       const { count: adminsCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'admin');
       const { count: masterAdminsCount } = await supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'master_admin');
-      const { count: unansweredCount } = await supabase.from('questions').select('*', { count: 'exact', head: true }).is('answer', null);
+      // Fetch Q&A unread chats
+      let unreadQA = 0;
+      let pendingQA = [];
+      try {
+        const qaRes = await fetch(`${API_URL}/api/qa/chats`);
+        const qaJson = await qaRes.json();
+        if (qaRes.ok && qaJson.success && Array.isArray(qaJson.chats)) {
+          pendingQA = qaJson.chats.filter(c => c.unreadCount > 0);
+          unreadQA = pendingQA.length;
+        }
+      } catch (qaErr) {
+        console.warn('QA chats fetch warning:', qaErr?.message);
+      }
 
       setStats({ 
         users: usersCount || 0, 
         admins: adminsCount || 0, 
         masterAdmins: masterAdminsCount || 0, 
-        unansweredQuestions: unansweredCount || 0,
+        unansweredQuestions: unreadQA,
         loading: false 
       });
 
@@ -55,15 +67,7 @@ export default function MasterAdminDashboardScreen({ navigation }) {
         .order('created_at', { ascending: false });
         
       setPendingRequests(requestsData || []);
-
-      // Fetch pending Q&A questions for the Mailbox
-      const { data: questionsData, error: qError } = await supabase
-        .from('questions')
-        .select('*, users!askedBy(*)')
-        .is('answer', null)
-        .order('created_at', { ascending: false });
-
-      setPendingQuestions(questionsData || []);
+      setPendingQuestions(pendingQA);
 
       // Fetch user registration dates for analytics graphs
       const { data: usersData } = await supabase
@@ -509,35 +513,53 @@ export default function MasterAdminDashboardScreen({ navigation }) {
 
                   {/* User Q&A Requests */}
                   {pendingQuestions.map(q => (
-                    <View key={`qa-${q.id}`} style={[styles.requestCard, { borderLeftColor: '#3498db' }]}>
+                    <View key={`qa-${q.userId || q.id}`} style={[styles.requestCard, { borderLeftColor: '#3498db' }]}>
                       <View style={styles.requestInfo}>
                         <View style={[styles.reqTypeBadge, { backgroundColor: '#eaf4fc' }]}>
                            <Ionicons name="chatbubbles" size={14} color="#3498db" style={{marginRight: 4}} />
-                           <Text style={[styles.requestType, { color: '#3498db' }]}>User Request: Q&A</Text>
+                           <Text style={[styles.requestType, { color: '#3498db' }]}>User Question: Q&A</Text>
                         </View>
                         <View style={styles.reqDataGrid}>
                           <View style={styles.reqRow}>
                             <Ionicons name="person" size={16} color="#7f8c8d" />
-                            <Text style={styles.reqValue}>{q.users?.name || 'Unknown User'}</Text>
+                            <Text style={styles.reqValue}>{q.userName || q.users?.name || 'User'}</Text>
                           </View>
-                          {q.users?.phone ? (
+                          {q.userPhone || q.users?.phone ? (
                             <View style={styles.reqRow}>
                               <Ionicons name="call" size={16} color="#7f8c8d" />
-                              <Text style={styles.reqValue}>{q.users.phone}</Text>
+                              <Text style={styles.reqValue}>{q.userPhone || q.users?.phone}</Text>
+                            </View>
+                          ) : null}
+                          {q.userEmail ? (
+                            <View style={styles.reqRow}>
+                              <Ionicons name="mail" size={16} color="#7f8c8d" />
+                              <Text style={styles.reqValue}>{q.userEmail}</Text>
                             </View>
                           ) : null}
                           <View style={styles.messageBox}>
-                            <Text style={styles.requestMessage} numberOfLines={2}>Question: {q.text ? 'Encrypted Message' : '(Image)'}</Text>
+                            <Text style={styles.requestMessage} numberOfLines={2}>
+                              Question: {q.lastMessage || (q.text ? 'Encrypted Message' : '(Image Attachment)')}
+                            </Text>
                           </View>
                         </View>
-                        <Text style={styles.requestDate}>{q.created_at || q.createdAt ? new Date(q.created_at || q.createdAt).toLocaleDateString() : 'Unknown Date'}</Text>
+                        <Text style={styles.requestDate}>
+                          {q.lastMessageTime ? new Date(q.lastMessageTime).toLocaleDateString() : (q.created_at ? new Date(q.created_at).toLocaleDateString() : 'Recent')}
+                        </Text>
                       </View>
                       <View style={[styles.requestActionRow, { borderTopColor: '#eaf4fc' }]}>
                         <TouchableOpacity style={[styles.resolveButton, { backgroundColor: '#3498db' }]} onPress={() => {
                           setShowMailbox(false);
-                          navigation.navigate('AskQuestions');
+                          if (q.userId) {
+                            navigation.navigate('ChatScreen', {
+                              chatUserId: q.userId,
+                              chatUserName: q.userName,
+                              chatUserEmail: q.userEmail,
+                            });
+                          } else {
+                            navigation.navigate('AskQuestions');
+                          }
                         }} activeOpacity={0.8}>
-                          <Text style={styles.resolveButtonText}>Open Q&A Screen</Text>
+                          <Text style={styles.resolveButtonText}>Reply to User</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
