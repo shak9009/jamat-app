@@ -27,6 +27,9 @@ import ManageRequestsScreen from '../screens/Admin/ManageRequestsScreen';
 import ManageUsersScreen from '../screens/Admin/ManageUsersScreen';
 import BecomeAdminScreen from '../screens/Requests/BecomeAdminScreen';
 import CustomHeader from '../components/CustomHeader';
+import QuranScreen from '../screens/Quran/QuranScreen';
+import SurahDetailScreen from '../screens/Quran/SurahDetailScreen';
+import DuaScreen from '../screens/Dua/DuaScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -60,6 +63,9 @@ function UserFlow() {
       <Stack.Screen name="SubmitRequest" component={SubmitRequestScreen} />
       <Stack.Screen name="BecomeAdmin" component={BecomeAdminScreen} />
       <Stack.Screen name="UlamasAndBayans" component={UlamasAndBayansScreen} />
+      <Stack.Screen name="Quran" component={QuranScreen} />
+      <Stack.Screen name="SurahDetail" component={SurahDetailScreen} />
+      <Stack.Screen name="Dua" component={DuaScreen} />
     </Stack.Navigator>
   );
 }
@@ -83,6 +89,9 @@ function AdminFlow() {
       <Stack.Screen name="Donation" component={DonationScreen} />
       <Stack.Screen name="SubmitRequest" component={SubmitRequestScreen} />
       <Stack.Screen name="BecomeAdmin" component={BecomeAdminScreen} />
+      <Stack.Screen name="Quran" component={QuranScreen} />
+      <Stack.Screen name="SurahDetail" component={SurahDetailScreen} />
+      <Stack.Screen name="Dua" component={DuaScreen} />
     </Stack.Navigator>
   );
 }
@@ -108,6 +117,9 @@ function MasterAdminFlow() {
       <Stack.Screen name="SubmitRequest" component={SubmitRequestScreen} />
       <Stack.Screen name="BecomeAdmin" component={BecomeAdminScreen} />
       <Stack.Screen name="ManageUsers" component={ManageUsersScreen} />
+      <Stack.Screen name="Quran" component={QuranScreen} />
+      <Stack.Screen name="SurahDetail" component={SurahDetailScreen} />
+      <Stack.Screen name="Dua" component={DuaScreen} />
     </Stack.Navigator>
   );
 }

@@ -24,6 +24,8 @@ export default function AdminDashboardScreen({ navigation }) {
   const [currentUpcomingIndex, setCurrentUpcomingIndex] = useState(0);
 
   const menuItems = [
+    { label: 'Holy Quran', screen: 'Quran', icon: 'book', color: '#0a3d1f', description: 'Read & Listen Surahs with Voice' },
+    { label: 'Daily Duas', screen: 'Dua', icon: 'heart', color: '#d97706', description: 'Authentic Duas with Audio & Counter' },
     { label: 'My Masjid', screen: 'ManageMasjid', icon: 'moon', color: '#1b6b3c', description: 'Update Timings & Committee' },
     { label: 'Manage Events', screen: 'Events', icon: 'calendar', color: '#e67e22', description: 'Upload Bayaan & Programs' },
     { label: 'Manage Ulamas', screen: 'ManageUlamas', icon: 'people', color: '#27ae60', description: 'Add Ulamas & Bayans' },

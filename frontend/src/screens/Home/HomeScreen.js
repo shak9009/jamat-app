@@ -567,6 +567,20 @@ export default function HomeScreen({ navigation }) {
 
         {/* Action Grid */}
         <View style={styles.grid}>
+          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Quran')} activeOpacity={0.8}>
+            <View style={[styles.cardIconWrapper, { backgroundColor: '#eaf5ee' }]}>
+              <Ionicons name="book" size={32} color="#0a3d1f" />
+            </View>
+            <Text style={styles.cardText}>Quran</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Dua')} activeOpacity={0.8}>
+            <View style={[styles.cardIconWrapper, { backgroundColor: '#fef7ed' }]}>
+              <Ionicons name="heart" size={32} color="#d97706" />
+            </View>
+            <Text style={styles.cardText}>Duas</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Events')} activeOpacity={0.8}>
             <View style={[styles.cardIconWrapper, { backgroundColor: '#fdf3e5' }]}>
               <Ionicons name="calendar" size={32} color="#f39c12" />

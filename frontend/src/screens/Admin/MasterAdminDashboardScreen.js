@@ -261,6 +261,8 @@ export default function MasterAdminDashboardScreen({ navigation }) {
   };
 
   const menuItems = [
+    { label: 'Holy Quran', screen: 'Quran', icon: 'book', color: '#0a3d1f', description: 'Read & Listen Surahs' },
+    { label: 'Daily Duas', screen: 'Dua', icon: 'heart', color: '#d97706', description: 'Duas with Voice & Tasbih' },
     { label: 'Create Admin', screen: 'CreateAdmin', icon: 'person-add', color: '#8e44ad', description: 'Give email & password' },
     { label: 'Manage Events', screen: 'Events', icon: 'calendar', color: '#e67e22', description: 'Add or edit events' },
     { label: 'Manage Ulamas', screen: 'ManageUlamas', icon: 'people', color: '#27ae60', description: 'Add Ulamas & Bayans' },
