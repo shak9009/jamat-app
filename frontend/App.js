@@ -7,7 +7,6 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { useFonts, Amiri_400Regular, Amiri_700Bold } from '@expo-google-fonts/amiri';
 
 import Toast from 'react-native-toast-message';
-import * as Updates from 'expo-updates';
 
 function AppContent() {
   const { refreshKey } = useRefresh();
@@ -26,22 +25,6 @@ export default function App() {
     Amiri_400Regular,
     Amiri_700Bold,
   });
-
-  useEffect(() => {
-    async function checkForUpdates() {
-      if (__DEV__) return;
-      try {
-        const update = await Updates.checkForUpdateAsync();
-        if (update.isAvailable) {
-          await Updates.fetchUpdateAsync();
-          await Updates.reloadAsync();
-        }
-      } catch (err) {
-        console.log('Update check error:', err?.message);
-      }
-    }
-    checkForUpdates();
-  }, []);
 
   if (!fontsLoaded) {
     return null;
