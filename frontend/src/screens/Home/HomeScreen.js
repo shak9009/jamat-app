@@ -7,7 +7,7 @@ import { useRefresh } from '../../context/RefreshContext';
 import { supabase } from '../../config/supabaseClient';
 import { API_URL } from '../../config/apiConfig';
 import Toast from 'react-native-toast-message';
-import { AzanAlertPopup, AzanSettingsModal } from '../../components/AzanAlertModal';
+import { AzanSettingsModal } from '../../components/AzanAlertModal';
 import { checkAndTriggerEarliestAzan, getAzanAlertEnabled, getAzanAlertOffset } from '../../services/AzanAlertService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -117,9 +117,6 @@ export default function HomeScreen({ navigation }) {
         if (!error && data && data.length > 0) {
           setMasjidsList(data);
           calculateEarliestPrayers(data);
-          checkAndTriggerEarliestAzan(data, (alertData) => {
-            setActiveAzanAlert(alertData);
-          });
           return;
         }
       } catch (supaErr) {
@@ -133,9 +130,6 @@ export default function HomeScreen({ navigation }) {
         if (data && data.length > 0) {
           setMasjidsList(data);
           calculateEarliestPrayers(data);
-          checkAndTriggerEarliestAzan(data, (alertData) => {
-            setActiveAzanAlert(alertData);
-          });
         }
       } catch (err) {
         // Silently catch firestore error
@@ -745,13 +739,6 @@ export default function HomeScreen({ navigation }) {
         </Modal>
 
       </ScrollView>
-
-      {/* Active Azan Alert Popup (with sound, 30s countdown, and Stop button) */}
-      <AzanAlertPopup
-        visible={!!activeAzanAlert}
-        alertData={activeAzanAlert}
-        onClose={() => setActiveAzanAlert(null)}
-      />
 
       {/* Azan Alert Settings Modal (toggle ON/OFF, timing, test voice) */}
       <AzanSettingsModal
