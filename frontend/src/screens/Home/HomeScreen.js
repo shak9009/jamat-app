@@ -8,7 +8,8 @@ import { supabase } from '../../config/supabaseClient';
 import { API_URL } from '../../config/apiConfig';
 import Toast from 'react-native-toast-message';
 import { AzanSettingsModal } from '../../components/AzanAlertModal';
-import { checkAndTriggerEarliestAzan, getAzanAlertEnabled, getAzanAlertOffset } from '../../services/AzanAlertService';
+import { getAzanAlertEnabled, getAzanAlertOffset } from '../../services/AzanAlertService';
+import { scheduleAzanNotifications } from '../../services/NotificationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -117,6 +118,7 @@ export default function HomeScreen({ navigation }) {
         if (!error && data && data.length > 0) {
           setMasjidsList(data);
           calculateEarliestPrayers(data);
+          scheduleAzanNotifications(data);
           return;
         }
       } catch (supaErr) {
@@ -130,6 +132,7 @@ export default function HomeScreen({ navigation }) {
         if (data && data.length > 0) {
           setMasjidsList(data);
           calculateEarliestPrayers(data);
+          scheduleAzanNotifications(data);
         }
       } catch (err) {
         // Silently catch firestore error
