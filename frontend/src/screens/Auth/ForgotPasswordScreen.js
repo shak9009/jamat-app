@@ -95,15 +95,11 @@ export default function ForgotPasswordScreen({ navigation }) {
         backendData = await response.json();
 
         if (!response.ok) {
-          throw new Error(backendData.error || 'Failed to send password reset code');
+          throw new Error(backendData?.error || 'Failed to send password reset code');
         }
-
-        resetTriggered = true;
       } catch (apiErr) {
-        console.warn('Backend send-reset-otp api warning:', apiErr?.message);
-        if (!resetTriggered) {
-          throw apiErr;
-        }
+        console.error('Backend send-reset-otp api error:', apiErr);
+        throw apiErr;
       }
 
       // Feedback to user

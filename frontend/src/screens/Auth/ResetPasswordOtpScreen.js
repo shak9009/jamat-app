@@ -50,8 +50,8 @@ export default function ResetPasswordOtpScreen({ navigation, route }) {
     setLoading(true);
     try {
       let resetSuccessful = false;
+      let backendErrorMsg = null;
 
-      // 1. First try backend verify-otp
       try {
         const response = await fetch(`${API_URL}/api/verify-otp`, {
           method: 'POST',
@@ -67,38 +67,15 @@ export default function ResetPasswordOtpScreen({ navigation, route }) {
         const data = await response.json();
         if (response.ok && data.success) {
           resetSuccessful = true;
-        } else if (!response.ok && !data.error?.includes('Network request failed')) {
-          // If backend gave explicit verification error, don't silently ignore
-          console.warn('Backend verify OTP response:', data.error);
+        } else {
+          backendErrorMsg = data?.error || 'Verification failed';
         }
       } catch (backendErr) {
-        console.warn('Backend verify error:', backendErr?.message);
-      }
-
-      // 2. Also try Supabase native recovery OTP verification as fallback
-      if (!resetSuccessful && email) {
-        try {
-          const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
-            email,
-            token: otp.trim(),
-            type: 'recovery',
-          });
-
-          if (!verifyErr && verifyData?.session) {
-            const { error: updateErr } = await supabase.auth.updateUser({
-              password: newPassword,
-            });
-            if (!updateErr) {
-              resetSuccessful = true;
-            }
-          }
-        } catch (supaErr) {
-          console.warn('Supabase recovery verify error:', supaErr?.message);
-        }
+        backendErrorMsg = backendErr?.message || 'Network error';
       }
 
       if (!resetSuccessful) {
-        throw new Error('Invalid or expired verification code. Please check your email and try again.');
+        throw new Error(backendErrorMsg || 'Invalid or expired verification code. Please check your email and try again.');
       }
 
       Toast.show({

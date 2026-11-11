@@ -278,7 +278,7 @@ module.exports = function() {
 
     const { data: record, error: otpError } = await supabase.from('otps').select('*').eq('phone', phone).single();
     
-    if (otpError || !record || new Date() > new Date(record.expires_at) || crypto.timingSafeEqual(Buffer.from(record.otp), Buffer.from(otp)) !== 0) {
+    if (otpError || !record || new Date() > new Date(record.expires_at) || String(record.otp).trim() !== String(otp).trim()) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
