@@ -83,10 +83,6 @@ module.exports = function() {
         return res.status(403).json({ error: 'Master Admin password cannot be reset via the app.' });
       }
 
-      if (existingUser.role === 'admin') {
-        return res.json({ role: existingUser.role, email: existingUser.email, phone: existingUser.phone });
-      }
-
       // Cryptographically secure 6-digit OTP
       const otp = (crypto.randomInt(0, 1000000)).toString().padStart(6, '0');
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
@@ -121,7 +117,7 @@ module.exports = function() {
       res.json({
         success: true,
         message: 'Password reset code has been sent to your email.',
-        role: 'user',
+        role: existingUser.role,
         email: existingUser.email,
         emailSent: emailResult.success,
         smtpConfigured: !emailResult.notConfigured,
@@ -138,40 +134,55 @@ module.exports = function() {
   router.post('/admin-request-password-reset', async (req, res) => {
     const { phone, email, base64Image, message } = req.body;
     
-    if (!phone || !email || !base64Image) {
-      return res.status(400).json({ error: 'Phone, email, and photo are required.' });
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required.' });
     }
 
     try {
-      const buffer = Buffer.from(base64Image, 'base64');
-      const fileExt = 'jpeg';
-      const fileName = `adminpwdreq-${Date.now()}.${fileExt}`;
-      const filePath = `requests/${fileName}`;
+      let finalPhone = phone;
+      if (!finalPhone) {
+        try {
+          const { data: u } = await supabase.from('users').select('phone').eq('email', email.toLowerCase().trim()).maybeSingle();
+          finalPhone = u?.phone || '';
+        } catch (_) {}
+      }
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(filePath, buffer, {
-          contentType: 'image/jpeg',
-          upsert: true
-        });
+      let publicUrl = null;
+      if (base64Image) {
+        try {
+          const buffer = Buffer.from(base64Image, 'base64');
+          const fileExt = 'jpeg';
+          const fileName = `adminpwdreq-${Date.now()}.${fileExt}`;
+          const filePath = `requests/${fileName}`;
 
-      if (uploadError) throw uploadError;
+          const { error: uploadError } = await supabase.storage
+            .from('images')
+            .upload(filePath, buffer, {
+              contentType: 'image/jpeg',
+              upsert: true
+            });
 
-      const { data: publicUrlData } = supabase.storage.from('images').getPublicUrl(filePath);
-      const publicUrl = publicUrlData.publicUrl;
+          if (!uploadError) {
+            const { data: publicUrlData } = supabase.storage.from('images').getPublicUrl(filePath);
+            publicUrl = publicUrlData?.publicUrl || null;
+          }
+        } catch (uploadErr) {
+          console.warn('Image upload error:', uploadErr?.message);
+        }
+      }
 
       const { error: insertError } = await supabase.from('admin_password_requests').insert([{
-        email,
-        phone,
+        email: email.toLowerCase().trim(),
+        phone: finalPhone || 'N/A',
         photo_url: publicUrl,
-        message,
+        message: message || 'Admin password reset request',
         request_type: 'password_reset',
         status: 'pending'
       }]);
 
       if (insertError) throw insertError;
 
-      res.json({ success: true });
+      res.json({ success: true, message: 'Password reset request submitted successfully.' });
     } catch (err) {
       console.error('Admin Password Request Error:', err);
       res.status(500).json({ error: 'Failed to submit password reset request.' });

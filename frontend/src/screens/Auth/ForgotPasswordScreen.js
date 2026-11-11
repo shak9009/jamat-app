@@ -26,6 +26,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   // Admin Request States
   const [isAdminFlow, setIsAdminFlow] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
+  const [adminPhone, setAdminPhone] = useState('');
   const [adminMessage, setAdminMessage] = useState('');
   const [adminImage, setAdminImage] = useState(null);
 
@@ -77,13 +78,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
         if (existingUsers && existingUsers[0]) {
           userPhone = existingUsers[0].phone;
-        }
-
-        if (existingUsers && existingUsers[0]?.role === 'admin') {
-          setIsAdminFlow(true);
-          setAdminEmail(cleanEmail);
-          setLoading(false);
-          return;
+          setAdminPhone(userPhone || '');
         }
       } catch (dbErr) {
         console.warn('Direct user check warning:', dbErr?.message);
@@ -111,13 +106,6 @@ export default function ForgotPasswordScreen({ navigation }) {
           body: JSON.stringify({ email: cleanEmail, phone: userPhone || cleanEmail })
         });
         backendData = await response.json();
-
-        if (response.ok && backendData.role === 'admin') {
-          setIsAdminFlow(true);
-          setAdminEmail(backendData.email || cleanEmail);
-          setLoading(false);
-          return;
-        }
 
         if (!response.ok) {
           throw new Error(backendData.error || 'Failed to send password reset code');
@@ -178,19 +166,15 @@ export default function ForgotPasswordScreen({ navigation }) {
   };
 
   const handleSubmitAdminRequest = async () => {
-    if (!adminImage) {
-      Alert.alert('Missing Photo', 'Please upload a photo for verification.');
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await fetch(`${API_URL}/api/admin-request-password-reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: adminEmail || email.trim().toLowerCase(),
-          base64Image: adminImage.base64,
+          email: (adminEmail || email).trim().toLowerCase(),
+          phone: adminPhone || '',
+          base64Image: adminImage ? adminImage.base64 : null,
           message: adminMessage.trim()
         })
       });
@@ -262,12 +246,24 @@ export default function ForgotPasswordScreen({ navigation }) {
                 {loading ? 'Sending Code...' : 'Send Reset Code'}
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ marginTop: 18, alignItems: 'center', padding: 8 }}
+              onPress={() => {
+                setAdminEmail(email.trim().toLowerCase());
+                setIsAdminFlow(true);
+              }}
+            >
+              <Text style={{ color: '#7f8c8d', fontSize: 13, textDecorationLine: 'underline' }}>
+                Admin? Submit Verification Request to Master Admin
+              </Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>
             <Text style={styles.title}>Admin Verification</Text>
             <Text style={styles.subtitle}>
-              Since you are an Admin, your password reset must be approved by a Master Admin. Please upload a photo to verify your identity.
+              Submit a verification request to the Master Admin to reset your admin account password.
             </Text>
 
             <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
@@ -276,7 +272,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               ) : (
                 <View style={styles.imagePlaceholder}>
                   <Ionicons name="camera" size={32} color="#7f8c8d" />
-                  <Text style={styles.imagePlaceholderText}>Upload Verification Photo</Text>
+                  <Text style={styles.imagePlaceholderText}>Upload Photo (Optional)</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -300,6 +296,15 @@ export default function ForgotPasswordScreen({ navigation }) {
             >
               <Text style={styles.buttonText}>
                 {loading ? 'Submitting...' : 'Submit Request'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ marginTop: 18, alignItems: 'center', padding: 8 }}
+              onPress={() => setIsAdminFlow(false)}
+            >
+              <Text style={{ color: '#0a3d1f', fontSize: 14, fontWeight: '600' }}>
+                ✉️ Send 6-Digit Code to Email Instead
               </Text>
             </TouchableOpacity>
           </>
