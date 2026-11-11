@@ -105,15 +105,6 @@ module.exports = function() {
         userName: existingUser.name,
       });
 
-      // 2. Also trigger Supabase Auth Email Reset as fallback
-      if (existingUser.email) {
-        try {
-          await supabase.auth.resetPasswordForEmail(existingUser.email);
-        } catch (mailErr) {
-          console.warn('Supabase resetPasswordForEmail notification:', mailErr.message);
-        }
-      }
-
       res.json({
         success: true,
         message: 'Password reset code has been sent to your email.',
@@ -386,7 +377,7 @@ module.exports = function() {
     // Check OTP record in DB
     const { data: record, error: otpError } = await supabase.from('otps').select('*').eq('phone', target).single();
 
-    if (otpError || !record || new Date() > new Date(record.expires_at) || crypto.timingSafeEqual(Buffer.from(record.otp), Buffer.from(otp.trim())) !== 0) {
+    if (otpError || !record || new Date() > new Date(record.expires_at) || String(record.otp).trim() !== String(otp).trim()) {
       return res.status(400).json({ error: 'Invalid or expired OTP code. Please check your email and try again.' });
     }
 

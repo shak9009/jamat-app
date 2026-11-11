@@ -22,7 +22,7 @@ import Toast from 'react-native-toast-message';
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   // Admin Request States
   const [isAdminFlow, setIsAdminFlow] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
@@ -52,7 +52,7 @@ export default function ForgotPasswordScreen({ navigation }) {
       });
       return;
     }
-    
+
     setLoading(true);
     try {
       // 1. Check if user is registered in Supabase users table
@@ -84,20 +84,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         console.warn('Direct user check warning:', dbErr?.message);
       }
 
-      // 2. Trigger Supabase native reset email (direct delivery to email inbox)
-      let resetTriggered = false;
-      try {
-        const { error: supaResetErr } = await supabase.auth.resetPasswordForEmail(cleanEmail);
-        if (!supaResetErr) {
-          resetTriggered = true;
-        } else {
-          console.warn('Supabase resetPasswordForEmail warning:', supaResetErr.message);
-        }
-      } catch (supaEx) {
-        console.warn('Supabase resetPasswordForEmail exception:', supaEx?.message);
-      }
-
-      // 3. Notify backend API to generate OTP and send via Email Service
+      // Notify backend API to generate OTP and send via Email Service
       let backendData = null;
       try {
         const response = await fetch(`${API_URL}/api/send-reset-otp`, {
@@ -198,7 +185,7 @@ export default function ForgotPasswordScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
+
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => {
           if (isAdminFlow) {
@@ -278,7 +265,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             </TouchableOpacity>
 
             <View style={styles.inputWrapper}>
-              <Ionicons name="chatbubble-outline" size={20} color="#7f8c8d" style={{marginHorizontal: 12}} />
+              <Ionicons name="chatbubble-outline" size={20} color="#7f8c8d" style={{ marginHorizontal: 12 }} />
               <TextInput
                 style={styles.input}
                 placeholder="Optional Message (e.g. My old phone broke)"

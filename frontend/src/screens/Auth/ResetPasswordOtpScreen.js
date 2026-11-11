@@ -127,11 +127,6 @@ export default function ResetPasswordOtpScreen({ navigation, route }) {
     if (!email) return;
     setResending(true);
     try {
-      // Trigger Supabase native reset email
-      try {
-        await supabase.auth.resetPasswordForEmail(email);
-      } catch (_) {}
-
       const response = await fetch(`${API_URL}/api/send-reset-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
