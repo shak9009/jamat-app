@@ -14,6 +14,7 @@ import { fetchSurahDetails, getSurahAudioUrl } from '../../data/quranData';
 import { quranAudioService } from '../../services/quranAudioService';
 import Toast from 'react-native-toast-message';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import CustomSlider from '../../components/CustomSlider';
 
 function SurahDetailScreenComponent({ route, navigation }) {
   const surahNumber = route?.params?.surahNumber || 1;
@@ -22,7 +23,7 @@ function SurahDetailScreenComponent({ route, navigation }) {
 
   const [surahData, setSurahData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [arabicFontSize, setArabicFontSize] = useState(24); // 20, 24, 28, 32
+  const [arabicFontSize, setArabicFontSize] = useState(24);
   const [playingAyahNumber, setPlayingAyahNumber] = useState(null);
 
   // Audio player status
@@ -41,6 +42,7 @@ function SurahDetailScreenComponent({ route, navigation }) {
   useEffect(() => {
     loadSurah();
     saveLastRead();
+    loadSavedFontSize();
 
     const unsubscribe = quranAudioService.subscribeStatus((status) => {
       if (status && typeof status === 'object') {
@@ -57,6 +59,26 @@ function SurahDetailScreenComponent({ route, navigation }) {
       }
     };
   }, [surahNumber]);
+
+  const loadSavedFontSize = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('quran_arabic_font_size');
+      if (saved) {
+        const num = parseInt(saved, 10);
+        if (num >= 18 && num <= 40) {
+          setArabicFontSize(num);
+        }
+      }
+    } catch (_) {}
+  };
+
+  const updateFontSize = async (size) => {
+    const rounded = Math.round(size);
+    setArabicFontSize(rounded);
+    try {
+      await AsyncStorage.setItem('quran_arabic_font_size', String(rounded));
+    } catch (_) {}
+  };
 
   const saveLastRead = async () => {
     try {
@@ -104,8 +126,14 @@ function SurahDetailScreenComponent({ route, navigation }) {
     }
   };
 
+  const handleSeekRelative = (secondsOffset) => {
+    const cur = audioStatus.currentTime || 0;
+    const dur = audioStatus.duration || 0;
+    const target = Math.max(0, Math.min(dur, cur + secondsOffset));
+    quranAudioService.seek(target);
+  };
+
   const handlePlayAyahAudio = async (ayah) => {
-    // High quality ayah audio from Islamic Network CDN
     const ayahAudioUrl = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${ayah.number}.mp3`;
 
     if (audioStatus.url === ayahAudioUrl && audioStatus.isPlaying) {
@@ -210,35 +238,94 @@ function SurahDetailScreenComponent({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-
-      {/* Top Audio Player Banner */}
+      {/* Top Audio Player Banner with Progress Seek Slider */}
       <View style={styles.topPlayerBar}>
-        <View style={styles.playerMeta}>
-          <Text style={styles.playerTitle} numberOfLines={1}>
-            {surahName} • Recitation by Mishary Alafasy
-          </Text>
-          <Text style={styles.playerTime}>
-            {audioStatus.url === fullSurahAudioUrl
-              ? `${formatSeconds(audioStatus.currentTime)} / ${formatSeconds(audioStatus.duration)}`
-              : 'Full Surah Voice Audio'}
-          </Text>
+        <View style={styles.playerTopRow}>
+          <View style={styles.playerMeta}>
+            <Text style={styles.playerTitle} numberOfLines={1}>
+              {surahName} • Mishary Alafasy
+            </Text>
+            <Text style={styles.playerSubtitle}>
+              {audioStatus.url === fullSurahAudioUrl
+                ? (isFullSurahPlaying ? 'Playing Surah recitation' : 'Audio paused')
+                : 'Full Surah Voice Audio'}
+            </Text>
+          </View>
+
+          <View style={styles.audioControlsRow}>
+            {/* -10s Rewind */}
+            <TouchableOpacity
+              onPress={() => handleSeekRelative(-10)}
+              style={styles.seekStepBtn}
+              activeOpacity={0.7}
+              disabled={audioStatus.url !== fullSurahAudioUrl}
+            >
+              <Ionicons
+                name="play-back"
+                size={16}
+                color={audioStatus.url === fullSurahAudioUrl ? '#fff' : '#6b9278'}
+              />
+            </TouchableOpacity>
+
+            {/* Main Play/Pause Button */}
+            <TouchableOpacity
+              onPress={handleToggleFullSurahAudio}
+              style={[styles.mainPlayBtn, isFullSurahPlaying && styles.mainPlayBtnActive]}
+              activeOpacity={0.8}
+            >
+              {isFullSurahBuffering ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons
+                  name={isFullSurahPlaying ? 'pause' : 'play'}
+                  size={20}
+                  color="#ffffff"
+                />
+              )}
+            </TouchableOpacity>
+
+            {/* +10s Forward */}
+            <TouchableOpacity
+              onPress={() => handleSeekRelative(10)}
+              style={styles.seekStepBtn}
+              activeOpacity={0.7}
+              disabled={audioStatus.url !== fullSurahAudioUrl}
+            >
+              <Ionicons
+                name="play-forward"
+                size={16}
+                color={audioStatus.url === fullSurahAudioUrl ? '#fff' : '#6b9278'}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <TouchableOpacity
-          onPress={handleToggleFullSurahAudio}
-          style={[styles.mainPlayBtn, isFullSurahPlaying && styles.mainPlayBtnActive]}
-          activeOpacity={0.8}
-        >
-          {isFullSurahBuffering ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons
-              name={isFullSurahPlaying ? 'pause' : 'play'}
-              size={22}
-              color="#ffffff"
-            />
-          )}
-        </TouchableOpacity>
+        {/* Audio Seek Slider */}
+        <View style={styles.seekSliderWrapper}>
+          <CustomSlider
+            value={audioStatus.currentTime || 0}
+            minimumValue={0}
+            maximumValue={audioStatus.duration > 0 ? audioStatus.duration : 100}
+            onSlidingComplete={(val) => {
+              quranAudioService.seek(val);
+            }}
+            minimumTrackTintColor="#d4af37"
+            maximumTrackTintColor="rgba(255, 255, 255, 0.25)"
+            thumbTintColor="#ffd700"
+            thumbSize={14}
+            trackHeight={4}
+            disabled={audioStatus.url !== fullSurahAudioUrl}
+            style={{ height: 20 }}
+          />
+          <View style={styles.timeLabelsRow}>
+            <Text style={styles.timeLabelText}>
+              {formatSeconds(audioStatus.currentTime)}
+            </Text>
+            <Text style={styles.timeLabelText}>
+              {formatSeconds(audioStatus.duration)}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Surah Content */}
@@ -269,6 +356,53 @@ function SurahDetailScreenComponent({ route, navigation }) {
                   </Text>
                 </View>
               )}
+
+              {/* Arabic Font Size Slider Card */}
+              <View style={styles.fontSizeCard}>
+                <View style={styles.fontSizeHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="text-outline" size={16} color="#1b6b3c" />
+                    <Text style={styles.fontSizeTitle}>Arabic Text Size</Text>
+                  </View>
+                  <View style={styles.fontSizeBadge}>
+                    <Text style={styles.fontSizeBadgeText}>{arabicFontSize}px</Text>
+                  </View>
+                </View>
+
+                <View style={styles.fontSizeSliderRow}>
+                  <TouchableOpacity
+                    style={styles.fontStepperBtn}
+                    onPress={() => updateFontSize(Math.max(18, arabicFontSize - 2))}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.fontStepperText}>A-</Text>
+                  </TouchableOpacity>
+
+                  <View style={{ flex: 1, marginHorizontal: 10 }}>
+                    <CustomSlider
+                      value={arabicFontSize}
+                      minimumValue={18}
+                      maximumValue={38}
+                      step={2}
+                      onValueChange={(val) => setArabicFontSize(Math.round(val))}
+                      onSlidingComplete={updateFontSize}
+                      minimumTrackTintColor="#1b6b3c"
+                      maximumTrackTintColor="#dce5df"
+                      thumbTintColor="#1b6b3c"
+                      thumbSize={16}
+                      trackHeight={4}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.fontStepperBtn}
+                    onPress={() => updateFontSize(Math.min(38, arabicFontSize + 2))}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.fontStepperText}>A+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           }
         />
@@ -287,33 +421,46 @@ export default function SurahDetailScreen(props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f7f4' },
-  headerBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  headerBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
+  // Top Audio Player Bar
   topPlayerBar: {
     backgroundColor: '#0a3d1f',
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1b6b3c',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  playerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1b6b3c',
   },
-  playerMeta: { flex: 1, marginRight: 14 },
+  playerMeta: { flex: 1, marginRight: 10 },
   playerTitle: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
-  playerTime: { fontSize: 11, color: '#c8e6c9', marginTop: 2 },
+  playerSubtitle: { fontSize: 11, color: '#c8e6c9', marginTop: 2 },
+  audioControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  seekStepBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   mainPlayBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#1b6b3c',
     justifyContent: 'center',
     alignItems: 'center',
@@ -322,12 +469,27 @@ const styles = StyleSheet.create({
   },
   mainPlayBtnActive: { backgroundColor: '#d4af37', borderColor: '#ffffff' },
 
+  // Audio Seek Slider
+  seekSliderWrapper: {
+    marginTop: 6,
+  },
+  timeLabelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  timeLabelText: {
+    fontSize: 10,
+    color: '#a3c9b1',
+    fontWeight: '600',
+  },
+
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { paddingHorizontal: 16, paddingBottom: 50 },
 
   surahHeader: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 18,
     marginBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e0ebd7',
@@ -336,7 +498,7 @@ const styles = StyleSheet.create({
   surahHeaderEnglish: { fontSize: 13, color: '#666' },
 
   bismillahBox: {
-    marginTop: 16,
+    marginTop: 14,
     paddingVertical: 10,
     paddingHorizontal: 24,
     backgroundColor: '#e8f5e9',
@@ -345,6 +507,60 @@ const styles = StyleSheet.create({
     borderColor: '#c8e6c9',
   },
   bismillahText: { fontSize: 22, color: '#0a3d1f', fontWeight: 'bold', textAlign: 'center' },
+
+  // Font Size Slider Card
+  fontSizeCard: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#e2ece4',
+  },
+  fontSizeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  fontSizeTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0a3d1f',
+    marginLeft: 6,
+  },
+  fontSizeBadge: {
+    backgroundColor: '#eaf4ee',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  fontSizeBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1b6b3c',
+  },
+  fontSizeSliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fontStepperBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f0f5f2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#dce5df',
+  },
+  fontStepperText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1b6b3c',
+  },
 
   ayahCard: {
     backgroundColor: '#ffffff',
