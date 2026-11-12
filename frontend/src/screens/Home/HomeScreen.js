@@ -22,7 +22,6 @@ export default function HomeScreen({ navigation }) {
   const [showJoinAdmin, setShowJoinAdmin] = useState(true);
 
   // Azan Alert state
-  const [activeAzanAlert, setActiveAzanAlert] = useState(null);
   const [showAzanSettings, setShowAzanSettings] = useState(false);
   const [azanAlertEnabled, setAzanAlertEnabledState] = useState(true);
   const [azanAlertOffset, setAzanAlertOffsetState] = useState(2);
@@ -238,9 +237,6 @@ export default function HomeScreen({ navigation }) {
       setMasjidsList(prev => {
         if (prev && prev.length > 0) {
           calculateEarliestPrayers(prev);
-          checkAndTriggerEarliestAzan(prev, (alertData) => {
-            setActiveAzanAlert(alertData);
-          });
         }
         return prev;
       });
