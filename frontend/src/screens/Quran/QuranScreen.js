@@ -7,14 +7,14 @@ import {
   FlatList,
   StyleSheet,
   ActivityIndicator,
-  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SURAHS_LIST, getSurahAudioUrl } from '../../data/quranData';
 import { quranAudioService } from '../../services/quranAudioService';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
-export default function QuranScreen({ navigation }) {
+function QuranScreenComponent({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all'); // all, meccan, medinan, bookmarked
   const [bookmarks, setBookmarks] = useState([]);
@@ -31,39 +31,44 @@ export default function QuranScreen({ navigation }) {
   });
 
   useEffect(() => {
-    navigation.setOptions({
-      title: 'Holy Quran (القرآن الكريم)',
-      headerStyle: { backgroundColor: '#0a3d1f' },
-      headerTintColor: '#ffffff',
-    });
-
     loadSavedState();
 
     const unsubscribe = quranAudioService.subscribeStatus((status) => {
-      setAudioStatus(status);
+      if (status && typeof status === 'object') {
+        setAudioStatus(status);
+      }
     });
 
     return () => {
-      unsubscribe();
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, []);
 
   const loadSavedState = async () => {
     try {
       const bKey = await AsyncStorage.getItem('quran_bookmarked_surahs');
-      if (bKey) setBookmarks(JSON.parse(bKey));
+      if (bKey) {
+        const parsed = JSON.parse(bKey);
+        if (Array.isArray(parsed)) setBookmarks(parsed);
+      }
 
       const lrKey = await AsyncStorage.getItem('quran_last_read_surah');
-      if (lrKey) setLastRead(JSON.parse(lrKey));
+      if (lrKey) {
+        const parsed = JSON.parse(lrKey);
+        if (parsed && typeof parsed === 'object') setLastRead(parsed);
+      }
     } catch (_) {}
   };
 
   const toggleBookmark = async (surahNumber) => {
+    const currentBookmarks = Array.isArray(bookmarks) ? bookmarks : [];
     let updated;
-    if (bookmarks.includes(surahNumber)) {
-      updated = bookmarks.filter((n) => n !== surahNumber);
+    if (currentBookmarks.includes(surahNumber)) {
+      updated = currentBookmarks.filter((n) => n !== surahNumber);
     } else {
-      updated = [...bookmarks, surahNumber];
+      updated = [...currentBookmarks, surahNumber];
     }
     setBookmarks(updated);
     try {
@@ -87,19 +92,20 @@ export default function QuranScreen({ navigation }) {
     }
   };
 
-  const filteredSurahs = SURAHS_LIST.filter((surah) => {
+  const currentBookmarks = Array.isArray(bookmarks) ? bookmarks : [];
+  const filteredSurahs = (SURAHS_LIST || []).filter((surah) => {
     // Filter type
     if (selectedFilter === 'meccan' && surah.revelationType !== 'Meccan') return false;
     if (selectedFilter === 'medinan' && surah.revelationType !== 'Medinan') return false;
-    if (selectedFilter === 'bookmarked' && !bookmarks.includes(surah.number)) return false;
+    if (selectedFilter === 'bookmarked' && !currentBookmarks.includes(surah.number)) return false;
 
     // Search query
     if (searchQuery.trim()) {
       const query = searchQuery.trim().toLowerCase();
       const matchNumber = String(surah.number) === query;
-      const matchEnglish = surah.englishName.toLowerCase().includes(query);
-      const matchTrans = surah.englishNameTranslation.toLowerCase().includes(query);
-      const matchArabic = surah.name.includes(query);
+      const matchEnglish = surah.englishName?.toLowerCase().includes(query);
+      const matchTrans = surah.englishNameTranslation?.toLowerCase().includes(query);
+      const matchArabic = surah.name?.includes(query);
       return matchNumber || matchEnglish || matchTrans || matchArabic;
     }
 
@@ -110,7 +116,7 @@ export default function QuranScreen({ navigation }) {
     const audioUrl = getSurahAudioUrl(item.number);
     const isThisPlaying = audioStatus.url === audioUrl && audioStatus.isPlaying;
     const isThisBuffering = audioStatus.url === audioUrl && audioStatus.isBuffering;
-    const isBookmarked = bookmarks.includes(item.number);
+    const isBookmarked = currentBookmarks.includes(item.number);
 
     return (
       <TouchableOpacity
@@ -186,8 +192,6 @@ export default function QuranScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a3d1f" />
-
       {/* Header Banner */}
       <View style={styles.headerBanner}>
         <View style={styles.bannerContent}>
@@ -199,7 +203,7 @@ export default function QuranScreen({ navigation }) {
         </View>
 
         {/* Last Read Quick Jump */}
-        {lastRead && (
+        {!!(lastRead && lastRead.englishName) ? (
           <TouchableOpacity
             style={styles.lastReadPill}
             onPress={() => {
@@ -216,7 +220,7 @@ export default function QuranScreen({ navigation }) {
               Continue: Surah {lastRead.englishName} ({lastRead.arabicName})
             </Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
 
       {/* Search Input Bar */}
@@ -245,7 +249,7 @@ export default function QuranScreen({ navigation }) {
           { key: 'all', label: 'All 114 Surahs' },
           { key: 'meccan', label: 'Meccan' },
           { key: 'medinan', label: 'Medinan' },
-          { key: 'bookmarked', label: `Saved (${bookmarks.length})` },
+          { key: 'bookmarked', label: `Saved (${currentBookmarks.length})` },
         ].map((f) => (
           <TouchableOpacity
             key={f.key}
@@ -265,7 +269,7 @@ export default function QuranScreen({ navigation }) {
         data={filteredSurahs}
         keyExtractor={(item) => String(item.number)}
         renderItem={renderSurahItem}
-        contentContainerStyle={[styles.listContent, audioStatus.url && { paddingBottom: 100 }]}
+        contentContainerStyle={[styles.listContent, audioStatus?.url ? { paddingBottom: 100 } : null]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -276,7 +280,7 @@ export default function QuranScreen({ navigation }) {
       />
 
       {/* Floating Bottom Mini Player (when audio is active) */}
-      {audioStatus.url && (
+      {!!audioStatus?.url ? (
         <View style={styles.miniPlayer}>
           <View style={styles.miniPlayerInfo}>
             <View style={styles.miniPlayerIcon}>
@@ -319,8 +323,16 @@ export default function QuranScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
-      )}
+      ) : null}
     </View>
+  );
+}
+
+export default function QuranScreen(props) {
+  return (
+    <ErrorBoundary title="Quran Screen Error">
+      <QuranScreenComponent {...props} />
+    </ErrorBoundary>
   );
 }
 

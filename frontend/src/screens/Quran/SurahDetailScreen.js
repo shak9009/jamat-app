@@ -7,17 +7,18 @@ import {
   StyleSheet,
   ActivityIndicator,
   Share,
-  Clipboard,
-  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchSurahDetails, getSurahAudioUrl } from '../../data/quranData';
 import { quranAudioService } from '../../services/quranAudioService';
 import Toast from 'react-native-toast-message';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
-export default function SurahDetailScreen({ route, navigation }) {
-  const { surahNumber, surahName, arabicName } = route.params;
+function SurahDetailScreenComponent({ route, navigation }) {
+  const surahNumber = route?.params?.surahNumber || 1;
+  const surahName = route?.params?.surahName || 'Al-Fatihah';
+  const arabicName = route?.params?.arabicName || 'الفَاتِحَة';
 
   const [surahData, setSurahData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,38 +39,22 @@ export default function SurahDetailScreen({ route, navigation }) {
   const isFullSurahBuffering = audioStatus.url === fullSurahAudioUrl && audioStatus.isBuffering;
 
   useEffect(() => {
-    navigation.setOptions({
-      title: `Surah ${surahName} (${arabicName})`,
-      headerStyle: { backgroundColor: '#0a3d1f' },
-      headerTintColor: '#ffffff',
-      headerRight: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {/* Font Size Toggle */}
-          <TouchableOpacity
-            onPress={() => {
-              setArabicFontSize((prev) => (prev >= 32 ? 20 : prev + 4));
-            }}
-            style={styles.headerBtn}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.headerBtnText}>A±</Text>
-          </TouchableOpacity>
-        </View>
-      ),
-    });
-
     loadSurah();
     saveLastRead();
 
     const unsubscribe = quranAudioService.subscribeStatus((status) => {
-      setAudioStatus(status);
-      if (status.isEnded) {
-        setPlayingAyahNumber(null);
+      if (status && typeof status === 'object') {
+        setAudioStatus(status);
+        if (status.isEnded) {
+          setPlayingAyahNumber(null);
+        }
       }
     });
 
     return () => {
-      unsubscribe();
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, [surahNumber]);
 
@@ -138,9 +123,7 @@ export default function SurahDetailScreen({ route, navigation }) {
   const handleCopyAyah = async (ayah) => {
     const textToCopy = `${ayah.text}\n\n"${ayah.translation}"\n(Surah ${surahName} ${surahNumber}:${ayah.numberInSurah})`;
     try {
-      if (Clipboard && typeof Clipboard.setString === 'function') {
-        Clipboard.setString(textToCopy);
-      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(textToCopy);
       }
     } catch (_) {}
@@ -227,7 +210,6 @@ export default function SurahDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a3d1f" />
 
       {/* Top Audio Player Banner */}
       <View style={styles.topPlayerBar}>
@@ -292,6 +274,14 @@ export default function SurahDetailScreen({ route, navigation }) {
         />
       )}
     </View>
+  );
+}
+
+export default function SurahDetailScreen(props) {
+  return (
+    <ErrorBoundary title="Surah Detail Error">
+      <SurahDetailScreenComponent {...props} />
+    </ErrorBoundary>
   );
 }
 

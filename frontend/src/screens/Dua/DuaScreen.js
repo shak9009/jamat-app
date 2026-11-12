@@ -8,16 +8,15 @@ import {
   StyleSheet,
   ActivityIndicator,
   Share,
-  Clipboard,
-  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DUA_CATEGORIES, DUAS_LIST } from '../../data/duaData';
 import { quranAudioService } from '../../services/quranAudioService';
 import Toast from 'react-native-toast-message';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
-export default function DuaScreen({ navigation }) {
+function DuaScreenComponent({ navigation }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [tasbihCounts, setTasbihCounts] = useState({});
@@ -34,39 +33,44 @@ export default function DuaScreen({ navigation }) {
   });
 
   useEffect(() => {
-    navigation.setOptions({
-      title: 'Daily Duas (أدعية وأذكار)',
-      headerStyle: { backgroundColor: '#0a3d1f' },
-      headerTintColor: '#ffffff',
-    });
-
     loadSavedState();
 
     const unsubscribe = quranAudioService.subscribeStatus((status) => {
-      setAudioStatus(status);
+      if (status && typeof status === 'object') {
+        setAudioStatus(status);
+      }
     });
 
     return () => {
-      unsubscribe();
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, []);
 
   const loadSavedState = async () => {
     try {
       const favs = await AsyncStorage.getItem('dua_favorite_ids');
-      if (favs) setFavorites(JSON.parse(favs));
+      if (favs) {
+        const parsed = JSON.parse(favs);
+        if (Array.isArray(parsed)) setFavorites(parsed);
+      }
 
       const savedCounts = await AsyncStorage.getItem('dua_tasbih_counts');
-      if (savedCounts) setTasbihCounts(JSON.parse(savedCounts));
+      if (savedCounts) {
+        const parsedCounts = JSON.parse(savedCounts);
+        if (parsedCounts && typeof parsedCounts === 'object') setTasbihCounts(parsedCounts);
+      }
     } catch (_) {}
   };
 
   const toggleFavorite = async (duaId) => {
+    const currentFavs = Array.isArray(favorites) ? favorites : [];
     let updated;
-    if (favorites.includes(duaId)) {
-      updated = favorites.filter((id) => id !== duaId);
+    if (currentFavs.includes(duaId)) {
+      updated = currentFavs.filter((id) => id !== duaId);
     } else {
-      updated = [...favorites, duaId];
+      updated = [...currentFavs, duaId];
     }
     setFavorites(updated);
     try {
@@ -75,11 +79,12 @@ export default function DuaScreen({ navigation }) {
   };
 
   const handleTasbihIncrement = async (dua) => {
-    const current = tasbihCounts[dua.id] || 0;
+    const currentCounts = (tasbihCounts && typeof tasbihCounts === 'object') ? tasbihCounts : {};
+    const current = currentCounts[dua.id] || 0;
     const target = dua.recommendedCount || 1;
     const next = current >= target ? 1 : current + 1;
 
-    const updated = { ...tasbihCounts, [dua.id]: next };
+    const updated = { ...currentCounts, [dua.id]: next };
     setTasbihCounts(updated);
 
     if (next === target) {
@@ -98,7 +103,8 @@ export default function DuaScreen({ navigation }) {
   };
 
   const handleTasbihReset = async (duaId) => {
-    const updated = { ...tasbihCounts, [duaId]: 0 };
+    const currentCounts = (tasbihCounts && typeof tasbihCounts === 'object') ? tasbihCounts : {};
+    const updated = { ...currentCounts, [duaId]: 0 };
     setTasbihCounts(updated);
     try {
       await AsyncStorage.setItem('dua_tasbih_counts', JSON.stringify(updated));
@@ -132,9 +138,7 @@ export default function DuaScreen({ navigation }) {
   const handleCopyDua = async (dua) => {
     const textToCopy = `${dua.arabic}\n\n"${dua.translation}"\n(${dua.reference})`;
     try {
-      if (Clipboard && typeof Clipboard.setString === 'function') {
-        Clipboard.setString(textToCopy);
-      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(textToCopy);
       }
     } catch (_) {}
@@ -142,19 +146,20 @@ export default function DuaScreen({ navigation }) {
     Toast.show({
       type: 'success',
       text1: 'Dua Copied 📋',
-      text2: 'Arabic text & translation copied to clipboard.',
+      text2: 'Arabic text & translation copied.',
       position: 'top',
       visibilityTime: 1800,
     });
   };
 
   // Filter list
-  const filteredDuas = DUAS_LIST.filter((dua) => {
+  const currentFavs = Array.isArray(favorites) ? favorites : [];
+  const filteredDuas = (DUAS_LIST || []).filter((dua) => {
     // Category filter
     if (selectedCategory !== 'all' && selectedCategory !== 'favorites') {
       if (dua.category !== selectedCategory) return false;
     } else if (selectedCategory === 'favorites') {
-      if (!favorites.includes(dua.id)) return false;
+      if (!currentFavs.includes(dua.id)) return false;
     }
 
     // Search query
@@ -171,11 +176,12 @@ export default function DuaScreen({ navigation }) {
     return true;
   });
 
+  const currentCounts = (tasbihCounts && typeof tasbihCounts === 'object') ? tasbihCounts : {};
   const renderDuaItem = ({ item }) => {
     const isPlaying = audioStatus.url === item.audioUrl && audioStatus.isPlaying;
     const isBuffering = audioStatus.url === item.audioUrl && audioStatus.isBuffering;
-    const isFav = favorites.includes(item.id);
-    const count = tasbihCounts[item.id] || 0;
+    const isFav = currentFavs.includes(item.id);
+    const count = currentCounts[item.id] || 0;
     const target = item.recommendedCount || 1;
     const isCompleted = count >= target && count > 0;
 
@@ -321,8 +327,6 @@ export default function DuaScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a3d1f" />
-
       {/* Header Search Bar */}
       <View style={styles.searchHeader}>
         <View style={styles.searchContainer}>
@@ -391,7 +395,7 @@ export default function DuaScreen({ navigation }) {
         renderItem={renderDuaItem}
         contentContainerStyle={[
           styles.listContent,
-          audioStatus.isPlaying && { paddingBottom: 110 },
+          audioStatus?.isPlaying ? { paddingBottom: 110 } : null,
         ]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -406,7 +410,7 @@ export default function DuaScreen({ navigation }) {
       />
 
       {/* Floating Bottom Audio Player (if playing/buffering) */}
-      {audioStatus.url && (
+      {!!audioStatus?.url ? (
         <View style={styles.floatingPlayer}>
           <View style={styles.playerInfo}>
             <Ionicons name="musical-notes" size={20} color="#d4af37" />
@@ -446,8 +450,16 @@ export default function DuaScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
-      )}
+      ) : null}
     </View>
+  );
+}
+
+export default function DuaScreen(props) {
+  return (
+    <ErrorBoundary title="Dua Screen Error">
+      <DuaScreenComponent {...props} />
+    </ErrorBoundary>
   );
 }
 

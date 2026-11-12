@@ -27,9 +27,18 @@ class AudioPlayerService {
   }
 
   notifyListeners(status) {
+    const safeStatus = {
+      url: null,
+      isPlaying: false,
+      isBuffering: false,
+      currentTime: 0,
+      duration: 0,
+      metadata: null,
+      ...(status || {}),
+    };
     this.statusListeners.forEach((listener) => {
       try {
-        listener(status);
+        listener(safeStatus);
       } catch (err) {
         console.warn('[AudioService] listener error:', err);
       }
